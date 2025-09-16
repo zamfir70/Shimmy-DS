@@ -1,13 +1,24 @@
 {
   "permissions": {
     "allow": [
+      "*",
+      "Bash(cargo build:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(gh api:*)",
+      "Bash(rm:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(./target/release/shimmy.exe serve:*)",
+      "Bash(curl:*)",
+      "Bash(git commit:*)",
+      "Bash(cargo check:*)",
       "Bash(git remote add:*)",
       "Bash(git init:*)",
-      "Bash(git pull:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git pull:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "defaultMode": "bypassPermissions"
   }
 }

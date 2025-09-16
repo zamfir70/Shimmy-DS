@@ -1,0 +1,77 @@
+# Rust build artifacts
+/target/
+/alt_target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock for binaries (keep it)
+# Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Internal development documents (NEVER commit)
+docs-internal/
+
+# Copilot instructions (internal only)
+.github/copilot-instructions.md
+
+# Local configuration
+.env
+.env.local
+
+# Test artifacts
+*.log
+*.db
+*.db-*
+
+# Package manager artifacts
+node_modules/
+dist/
+build/
+
+# Model files (can be large)
+*.gguf
+*.ggml
+*.safetensors
+*.bin
+models/
+
+# Development artifacts and testing files
+punch_analysis.json
+ollama_test_result.txt
+rustchain.exe
+coverage_run.log
+*.ps1
+SHOWCASE-SUMMARY.md
+
+# Temporary files and analysis
+*.tmp
+*.temp
+*~
+*_analysis.json
+*_test_result.txt
+AUTO_DISCOVERY_PLAN.md
+CURRENT_STATE_ANALYSIS.md
+DETAILED_INTEGRATION_PLANS.md
+DISCOVERY_IMPLEMENTATION_ROADMAP.md
+INTEGRATION_ROADMAP.md
+NEXT_PHASE_PLAN.md
+shimmy_rust_golden_record_implementation_bible.md
+test_*.yaml
+
+# Coverage and profiling artifacts  
+coverage/
+*.profraw
