@@ -33,6 +33,14 @@ pub mod shimmy_config;
 pub mod recursive_drift_stabilizer;
 pub mod stability_log;
 
+// SHIMMY-DS Recursive Narrative System
+pub mod narrative_dna;
+pub mod constraint_space;
+pub mod multi_level_recursion;
+pub mod character_consistency;
+pub mod reader_engagement_loops;
+pub mod recursive_narrative_assistant;
+
 #[cfg(test)]
 pub mod tests;
 
