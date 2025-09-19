@@ -4,11 +4,18 @@
 /// for the Recursive Drift Stabilizer system.
 
 use crate::recursive_drift_stabilizer::{DriftStabilityState, DriftStabilizerConfig};
+use crate::recursive_integrity_core::{
+    RICDecision, RICHealthSummary, RICMode, InsightStatus
+};
+use crate::recursive_narrative_assistant::{
+    UnifiedArbitrationDecision, RIPRICFusionHealth
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 /// Represents a stability log entry with detailed metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,18 +84,262 @@ impl StabilityLogEntry {
     }
 }
 
+/// RIC-specific log entry for tracking integrity core decisions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RICLogEntry {
+    /// Timestamp of the log entry
+    pub timestamp: DateTime<Utc>,
+    /// Chapter number when this entry was created
+    pub chapter: u32,
+    /// RIC decision made
+    pub decision: String, // Serialized version of RICDecision
+    /// Votes from each subsystem
+    pub subsystem_votes: HashMap<String, String>, // subsystem -> InsightStatus as string
+    /// Mode RIC was operating in
+    pub ric_mode: RICMode,
+    /// Number of interventions so far
+    pub intervention_count: u32,
+    /// Saturated systems
+    pub saturated_systems: Vec<String>,
+    /// Description of what caused this decision
+    pub reason: String,
+    /// Additional context
+    pub context: serde_json::Value,
+}
+
+impl RICLogEntry {
+    /// Creates a new RIC log entry
+    pub fn new(
+        chapter: u32,
+        decision: RICDecision,
+        votes: &[(String, InsightStatus)],
+        ric_mode: RICMode,
+        intervention_count: u32,
+        reason: String,
+    ) -> Self {
+        let decision_str = match decision {
+            RICDecision::Continue => "Continue".to_string(),
+            RICDecision::Halt => "Halt".to_string(),
+            RICDecision::InjectFloor => "InjectFloor".to_string(),
+            RICDecision::Reroute(ref alt) => format!("Reroute({})", alt),
+        };
+
+        let votes_map: HashMap<String, String> = votes.iter()
+            .map(|(system, status)| {
+                let status_str = match status {
+                    InsightStatus::Continue => "Continue",
+                    InsightStatus::Block => "Block",
+                    InsightStatus::Suggest => "Suggest",
+                    InsightStatus::Stalled => "Stalled",
+                };
+                (system.clone(), status_str.to_string())
+            })
+            .collect();
+
+        Self {
+            timestamp: Utc::now(),
+            chapter,
+            decision: decision_str,
+            subsystem_votes: votes_map,
+            ric_mode,
+            intervention_count,
+            saturated_systems: Vec::new(),
+            reason,
+            context: serde_json::Value::Null,
+        }
+    }
+
+    /// Adds saturated systems info
+    pub fn with_saturated_systems(mut self, systems: Vec<String>) -> Self {
+        self.saturated_systems = systems;
+        self
+    }
+
+    /// Adds context information
+    pub fn with_context(mut self, context: serde_json::Value) -> Self {
+        self.context = context;
+        self
+    }
+
+    /// Formats this entry for text logging
+    pub fn format_for_text(&self) -> String {
+        let votes_str = self.subsystem_votes.iter()
+            .map(|(system, vote)| format!("{}:{}", system, vote))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let saturated_str = if self.saturated_systems.is_empty() {
+            "none".to_string()
+        } else {
+            self.saturated_systems.join(", ")
+        };
+
+        format!(
+            "[RIC] {} | Ch:{} | Decision:{} | Votes:[{}] | Mode:{:?} | Interventions:{} | Saturated:[{}] | {}",
+            self.timestamp.format("%H:%M:%S"),
+            self.chapter,
+            self.decision,
+            votes_str,
+            self.ric_mode,
+            self.intervention_count,
+            saturated_str,
+            self.reason
+        )
+    }
+}
+
+/// RIP+RIC unified fusion log entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RIPRICFusionLogEntry {
+    /// Timestamp of the log entry
+    pub timestamp: DateTime<Utc>,
+    /// Chapter number when this entry was created
+    pub chapter: u32,
+    /// Scene number if available
+    pub scene: Option<u32>,
+    /// Unified arbitration decision made
+    pub unified_decision: String, // Serialized UnifiedArbitrationDecision
+    /// RIP constraint genome health score
+    pub rip_genome_health: f32,
+    /// RIP guard chain validation success rate
+    pub rip_guard_health: f32,
+    /// RIP pathogen detection threat level
+    pub rip_pathogen_threat: f32,
+    /// RIC subsystem consensus health
+    pub ric_consensus_health: f32,
+    /// RIC recursive saturation level
+    pub ric_saturation_level: f32,
+    /// Current recursion budget from ZC gates
+    pub current_recursion_budget: u32,
+    /// Loop saturation detection state
+    pub loop_saturation_detected: bool,
+    /// RIP Python process connection state
+    pub rip_process_healthy: bool,
+    /// Narrative text analyzed
+    pub analyzed_text: String,
+    /// Narrative context
+    pub narrative_context: String,
+    /// Overall fusion health score
+    pub overall_fusion_health: f32,
+    /// Additional context
+    pub context: serde_json::Value,
+}
+
+impl RIPRICFusionLogEntry {
+    /// Creates a new RIP+RIC fusion log entry
+    pub fn new(
+        chapter: u32,
+        scene: Option<u32>,
+        decision: UnifiedArbitrationDecision,
+        fusion_health: RIPRICFusionHealth,
+        analyzed_text: String,
+        narrative_context: String,
+    ) -> Self {
+        let decision_str = match decision {
+            UnifiedArbitrationDecision::ContinueRecursion { consensus_confidence, .. } => {
+                format!("ContinueRecursion(confidence:{:.2})", consensus_confidence)
+            }
+            UnifiedArbitrationDecision::RIPConstraintHalt { ref failed_ligands, .. } => {
+                format!("RIPConstraintHalt(ligands:{})", failed_ligands.len())
+            }
+            UnifiedArbitrationDecision::RICConsensusHalt { ref halt_reason, .. } => {
+                format!("RICConsensusHalt({})", halt_reason)
+            }
+            UnifiedArbitrationDecision::PathogenDetectionHalt { threat_level, .. } => {
+                format!("PathogenDetectionHalt(threat:{:.2})", threat_level)
+            }
+            UnifiedArbitrationDecision::LoopSaturationHalt { budget_exhausted, .. } => {
+                format!("LoopSaturationHalt(budget_exhausted:{})", budget_exhausted)
+            }
+            UnifiedArbitrationDecision::UnifiedContinuityFloor { ref fusion_reason, .. } => {
+                format!("UnifiedContinuityFloor({})", fusion_reason)
+            }
+        };
+
+        Self {
+            timestamp: Utc::now(),
+            chapter,
+            scene,
+            unified_decision: decision_str,
+            rip_genome_health: fusion_health.rip_genome_health,
+            rip_guard_health: fusion_health.rip_guard_health,
+            rip_pathogen_threat: fusion_health.rip_pathogen_threat,
+            ric_consensus_health: fusion_health.ric_consensus_health,
+            ric_saturation_level: fusion_health.ric_saturation_level,
+            current_recursion_budget: fusion_health.current_recursion_budget,
+            loop_saturation_detected: fusion_health.loop_saturation_detected,
+            rip_process_healthy: fusion_health.rip_process_healthy,
+            analyzed_text,
+            narrative_context,
+            overall_fusion_health: fusion_health.overall_fusion_health,
+            context: serde_json::Value::Null,
+        }
+    }
+
+    /// Adds context information
+    pub fn with_context(mut self, context: serde_json::Value) -> Self {
+        self.context = context;
+        self
+    }
+
+    /// Formats this entry for text logging
+    pub fn format_for_text(&self) -> String {
+        let health_status = match self.overall_fusion_health {
+            h if h >= 0.8 => "🟢 EXCELLENT",
+            h if h >= 0.6 => "🟡 GOOD",
+            h if h >= 0.4 => "🟠 MODERATE",
+            h if h >= 0.2 => "🔴 POOR",
+            _ => "🚨 CRITICAL",
+        };
+
+        let process_status = if self.rip_process_healthy { "✅" } else { "❌" };
+        let saturation_status = if self.loop_saturation_detected { "⚠️ SAT" } else { "✅" };
+
+        format!(
+            "[RIP+RIC FUSION] {} | Ch:{}{} | Decision:{} | Health:{} ({:.2}) | RIP:{:.2}/{:.2}/{:.2} | RIC:{:.2}/{:.2} | Budget:{} | Process:{} Sat:{} | Text:{}...",
+            self.timestamp.format("%H:%M:%S"),
+            self.chapter,
+            self.scene.map_or("".to_string(), |s| format!(".{}", s)),
+            self.unified_decision,
+            health_status,
+            self.overall_fusion_health,
+            self.rip_genome_health,
+            self.rip_guard_health,
+            self.rip_pathogen_threat,
+            self.ric_consensus_health,
+            self.ric_saturation_level,
+            self.current_recursion_budget,
+            process_status,
+            saturation_status,
+            self.analyzed_text.chars().take(50).collect::<String>()
+        )
+    }
+}
+
 /// Manages stability logging for the drift stabilizer
 pub struct StabilityLogger {
     /// Path to the stability log file
     log_path: PathBuf,
     /// Path to the JSON stability log
     json_log_path: PathBuf,
+    /// Path to the RIC-specific log file
+    ric_log_path: PathBuf,
+    /// Path to the RIC JSON log
+    ric_json_log_path: PathBuf,
+    /// Path to the unified RIP+RIC fusion log
+    rip_ric_fusion_log_path: PathBuf,
+    /// Path to the RIP+RIC fusion JSON log
+    rip_ric_fusion_json_path: PathBuf,
     /// Whether logging is enabled
     enabled: bool,
     /// Maximum number of entries to keep in memory
     max_memory_entries: usize,
     /// In-memory cache of recent entries
     recent_entries: Vec<StabilityLogEntry>,
+    /// In-memory cache of recent RIC entries
+    recent_ric_entries: Vec<RICLogEntry>,
+    /// In-memory cache of recent RIP+RIC fusion entries
+    recent_fusion_entries: Vec<RIPRICFusionLogEntry>,
 }
 
 impl StabilityLogger {
@@ -97,20 +348,33 @@ impl StabilityLogger {
         Self {
             log_path: PathBuf::from("logs/stability.log"),
             json_log_path: PathBuf::from("logs/stability.json"),
+            ric_log_path: PathBuf::from("logs/ric.log"),
+            ric_json_log_path: PathBuf::from("logs/ric.json"),
+            rip_ric_fusion_log_path: PathBuf::from("logs/rip_ric_fusion.log"),
+            rip_ric_fusion_json_path: PathBuf::from("logs/rip_ric_fusion.json"),
             enabled: true,
             max_memory_entries: 100,
             recent_entries: Vec::new(),
+            recent_ric_entries: Vec::new(),
+            recent_fusion_entries: Vec::new(),
         }
     }
 
     /// Creates a new stability logger with custom paths
     pub fn with_paths(text_path: impl AsRef<Path>, json_path: impl AsRef<Path>) -> Self {
+        let base_dir = text_path.as_ref().parent().unwrap_or(Path::new("logs"));
         Self {
             log_path: text_path.as_ref().to_path_buf(),
             json_log_path: json_path.as_ref().to_path_buf(),
+            ric_log_path: base_dir.join("ric.log"),
+            ric_json_log_path: base_dir.join("ric.json"),
+            rip_ric_fusion_log_path: base_dir.join("rip_ric_fusion.log"),
+            rip_ric_fusion_json_path: base_dir.join("rip_ric_fusion.json"),
             enabled: true,
             max_memory_entries: 100,
             recent_entries: Vec::new(),
+            recent_ric_entries: Vec::new(),
+            recent_fusion_entries: Vec::new(),
         }
     }
 
@@ -376,6 +640,431 @@ impl StabilityLogger {
         }
         Ok(())
     }
+
+    /// Logs a RIC decision and voting information
+    pub fn log_ric_decision(
+        &mut self,
+        chapter: u32,
+        decision: RICDecision,
+        votes: &[(String, InsightStatus)],
+        ric_mode: RICMode,
+        intervention_count: u32,
+        saturated_systems: Vec<String>,
+        reason: String,
+        context: Option<serde_json::Value>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        let mut entry = RICLogEntry::new(
+            chapter,
+            decision,
+            votes,
+            ric_mode,
+            intervention_count,
+            reason
+        ).with_saturated_systems(saturated_systems);
+
+        if let Some(ctx) = context {
+            entry = entry.with_context(ctx);
+        }
+
+        // Add to memory cache
+        self.recent_ric_entries.push(entry.clone());
+        if self.recent_ric_entries.len() > self.max_memory_entries {
+            self.recent_ric_entries.remove(0);
+        }
+
+        // Write to text log
+        self.write_ric_text_log(&entry)?;
+
+        // Write to JSON log
+        self.write_ric_json_log(&entry)?;
+
+        Ok(())
+    }
+
+    /// Writes RIC entry to text log
+    fn write_ric_text_log(&self, entry: &RICLogEntry) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure log directory exists
+        if let Some(parent) = self.ric_log_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.ric_log_path)?;
+
+        writeln!(file, "{}", entry.format_for_text())?;
+        Ok(())
+    }
+
+    /// Writes RIC entry to JSON log
+    fn write_ric_json_log(&self, entry: &RICLogEntry) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure log directory exists
+        if let Some(parent) = self.ric_json_log_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.ric_json_log_path)?;
+
+        let json_str = serde_json::to_string(entry)?;
+        writeln!(file, "{}", json_str)?;
+        Ok(())
+    }
+
+    /// Gets recent RIC entries
+    pub fn get_recent_ric_entries(&self, count: usize) -> Vec<RICLogEntry> {
+        self.recent_ric_entries
+            .iter()
+            .rev()
+            .take(count)
+            .cloned()
+            .collect()
+    }
+
+    /// Reads RIC history from JSON log file
+    pub fn read_ric_history(&self) -> Result<Vec<RICLogEntry>, Box<dyn std::error::Error>> {
+        if !self.ric_json_log_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let content = std::fs::read_to_string(&self.ric_json_log_path)?;
+        let mut entries = Vec::new();
+
+        for line in content.lines() {
+            if !line.trim().is_empty() {
+                if let Ok(entry) = serde_json::from_str::<RICLogEntry>(line) {
+                    entries.push(entry);
+                }
+            }
+        }
+
+        Ok(entries)
+    }
+
+    /// Generates RIC trend analysis report
+    pub fn generate_ric_analysis(&self, entry_limit: usize) -> Result<String, Box<dyn std::error::Error>> {
+        let history = self.read_ric_history()?;
+        let recent_history: Vec<_> = history.iter().rev().take(entry_limit).collect();
+
+        let mut report = String::new();
+        report.push_str("🔒 RIC INTEGRITY ANALYSIS REPORT\n");
+        report.push_str("==================================\n\n");
+
+        report.push_str(&format!("Total RIC Entries: {}\n", history.len()));
+        report.push_str(&format!("Analyzed Recent Entries: {}\n\n", recent_history.len()));
+
+        if recent_history.is_empty() {
+            report.push_str("No RIC activity recorded.\n");
+            return Ok(report);
+        }
+
+        // Decision type analysis
+        let total_decisions = recent_history.len() as f32;
+        let continue_count = recent_history.iter().filter(|e| e.decision == "Continue").count();
+        let halt_count = recent_history.iter().filter(|e| e.decision == "Halt").count();
+        let floor_count = recent_history.iter().filter(|e| e.decision == "InjectFloor").count();
+        let reroute_count = recent_history.iter().filter(|e| e.decision.starts_with("Reroute")).count();
+
+        report.push_str("📊 Decision Distribution:\n");
+        report.push_str(&format!("  • Continue: {} ({:.1}%)\n", continue_count, (continue_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Halt: {} ({:.1}%)\n", halt_count, (halt_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Inject Floor: {} ({:.1}%)\n", floor_count, (floor_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Reroute: {} ({:.1}%)\n\n", reroute_count, (reroute_count as f32 / total_decisions) * 100.0));
+
+        // Intervention analysis
+        let intervention_rate = (halt_count + floor_count + reroute_count) as f32 / total_decisions;
+        let avg_interventions = recent_history.iter().map(|e| e.intervention_count as f32).sum::<f32>() / total_decisions;
+
+        report.push_str("🛡️ Intervention Analysis:\n");
+        report.push_str(&format!("  • Intervention Rate: {:.1}%\n", intervention_rate * 100.0));
+        report.push_str(&format!("  • Average Intervention Count: {:.1}\n\n", avg_interventions));
+
+        // System saturation analysis
+        let mut saturation_frequency: HashMap<String, usize> = HashMap::new();
+        for entry in &recent_history {
+            for system in &entry.saturated_systems {
+                *saturation_frequency.entry(system.clone()).or_insert(0) += 1;
+            }
+        }
+
+        if !saturation_frequency.is_empty() {
+            report.push_str("⚠️ System Saturation Frequency:\n");
+            let mut sorted_saturations: Vec<_> = saturation_frequency.iter().collect();
+            sorted_saturations.sort_by(|a, b| b.1.cmp(a.1));
+            for (system, count) in sorted_saturations.iter().take(5) {
+                report.push_str(&format!("  • {}: {} times\n", system, count));
+            }
+            report.push('\n');
+        }
+
+        // Mode analysis
+        let mut mode_distribution: HashMap<String, usize> = HashMap::new();
+        for entry in &recent_history {
+            let mode_str = format!("{:?}", entry.ric_mode);
+            *mode_distribution.entry(mode_str).or_insert(0) += 1;
+        }
+
+        report.push_str("⚙️ Mode Distribution:\n");
+        for (mode, count) in mode_distribution {
+            report.push_str(&format!("  • {}: {} ({:.1}%)\n", mode, count, (count as f32 / total_decisions) * 100.0));
+        }
+        report.push('\n');
+
+        // Recent activity
+        report.push_str("📋 Recent RIC Activity:\n");
+        for entry in recent_history.iter().rev().take(5) {
+            report.push_str(&format!("  • {}\n", entry.format_for_text()));
+        }
+
+        Ok(report)
+    }
+
+    /// Clears all RIC logs
+    pub fn clear_ric_logs(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.ric_log_path.exists() {
+            std::fs::remove_file(&self.ric_log_path)?;
+        }
+        if self.ric_json_log_path.exists() {
+            std::fs::remove_file(&self.ric_json_log_path)?;
+        }
+        Ok(())
+    }
+
+    /// RIP+RIC FUSION LOGGING: Logs a unified arbitration decision
+    pub fn log_rip_ric_fusion(
+        &mut self,
+        chapter: u32,
+        scene: Option<u32>,
+        decision: UnifiedArbitrationDecision,
+        fusion_health: RIPRICFusionHealth,
+        analyzed_text: String,
+        narrative_context: String,
+        context: Option<serde_json::Value>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        let mut entry = RIPRICFusionLogEntry::new(
+            chapter,
+            scene,
+            decision,
+            fusion_health,
+            analyzed_text,
+            narrative_context,
+        );
+
+        if let Some(ctx) = context {
+            entry = entry.with_context(ctx);
+        }
+
+        // Add to memory cache
+        self.recent_fusion_entries.push(entry.clone());
+        if self.recent_fusion_entries.len() > self.max_memory_entries {
+            self.recent_fusion_entries.remove(0);
+        }
+
+        // Write to text log
+        self.write_fusion_text_log(&entry)?;
+
+        // Write to JSON log
+        self.write_fusion_json_log(&entry)?;
+
+        Ok(())
+    }
+
+    /// Writes RIP+RIC fusion entry to text log
+    fn write_fusion_text_log(&self, entry: &RIPRICFusionLogEntry) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure log directory exists
+        if let Some(parent) = self.rip_ric_fusion_log_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.rip_ric_fusion_log_path)?;
+
+        writeln!(file, "{}", entry.format_for_text())?;
+
+        // Add detailed breakdown for complex decisions
+        match entry.unified_decision.as_str() {
+            s if s.starts_with("PathogenDetectionHalt") => {
+                writeln!(file, "    🦠 PATHOGEN DETAILS: Threat:{:.2} | RIP Health:{:.2}/{:.2} | Process:{}",
+                    entry.rip_pathogen_threat, entry.rip_genome_health, entry.rip_guard_health,
+                    if entry.rip_process_healthy { "OK" } else { "FAIL" })?;
+            }
+            s if s.starts_with("LoopSaturationHalt") => {
+                writeln!(file, "    🔄 SATURATION DETAILS: Budget:{} | RIC Health:{:.2}/{:.2} | Detected:{}",
+                    entry.current_recursion_budget, entry.ric_consensus_health, entry.ric_saturation_level,
+                    if entry.loop_saturation_detected { "YES" } else { "NO" })?;
+            }
+            s if s.starts_with("UnifiedContinuityFloor") => {
+                writeln!(file, "    🛡️ CONTINUITY FLOOR: Overall Health:{:.2} | Context: {}",
+                    entry.overall_fusion_health,
+                    entry.narrative_context.chars().take(100).collect::<String>())?;
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    /// Writes RIP+RIC fusion entry to JSON log
+    fn write_fusion_json_log(&self, entry: &RIPRICFusionLogEntry) -> Result<(), Box<dyn std::error::Error>> {
+        // Ensure log directory exists
+        if let Some(parent) = self.rip_ric_fusion_json_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.rip_ric_fusion_json_path)?;
+
+        let json_str = serde_json::to_string(entry)?;
+        writeln!(file, "{}", json_str)?;
+        Ok(())
+    }
+
+    /// Gets recent RIP+RIC fusion entries
+    pub fn get_recent_fusion_entries(&self, count: usize) -> Vec<RIPRICFusionLogEntry> {
+        self.recent_fusion_entries
+            .iter()
+            .rev()
+            .take(count)
+            .cloned()
+            .collect()
+    }
+
+    /// Reads RIP+RIC fusion history from JSON log file
+    pub fn read_fusion_history(&self) -> Result<Vec<RIPRICFusionLogEntry>, Box<dyn std::error::Error>> {
+        if !self.rip_ric_fusion_json_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let content = std::fs::read_to_string(&self.rip_ric_fusion_json_path)?;
+        let mut entries = Vec::new();
+
+        for line in content.lines() {
+            if !line.trim().is_empty() {
+                if let Ok(entry) = serde_json::from_str::<RIPRICFusionLogEntry>(line) {
+                    entries.push(entry);
+                }
+            }
+        }
+
+        Ok(entries)
+    }
+
+    /// Generates comprehensive RIP+RIC fusion analysis report
+    pub fn generate_fusion_analysis(&self, entry_limit: usize) -> Result<String, Box<dyn std::error::Error>> {
+        let history = self.read_fusion_history()?;
+        let recent_history: Vec<_> = history.iter().rev().take(entry_limit).collect();
+
+        let mut report = String::new();
+        report.push_str("🔗 RIP+RIC UNIFIED PROTOCOL ANALYSIS\n");
+        report.push_str("=====================================\n\n");
+
+        report.push_str(&format!("Total Fusion Entries: {}\n", history.len()));
+        report.push_str(&format!("Analyzed Recent Entries: {}\n\n", recent_history.len()));
+
+        if recent_history.is_empty() {
+            report.push_str("No RIP+RIC fusion activity recorded.\n");
+            return Ok(report);
+        }
+
+        // Decision type analysis
+        let total_decisions = recent_history.len() as f32;
+        let continue_count = recent_history.iter().filter(|e| e.unified_decision.starts_with("ContinueRecursion")).count();
+        let rip_halt_count = recent_history.iter().filter(|e| e.unified_decision.starts_with("RIPConstraintHalt")).count();
+        let ric_halt_count = recent_history.iter().filter(|e| e.unified_decision.starts_with("RICConsensusHalt")).count();
+        let pathogen_halt_count = recent_history.iter().filter(|e| e.unified_decision.starts_with("PathogenDetectionHalt")).count();
+        let saturation_halt_count = recent_history.iter().filter(|e| e.unified_decision.starts_with("LoopSaturationHalt")).count();
+        let floor_count = recent_history.iter().filter(|e| e.unified_decision.starts_with("UnifiedContinuityFloor")).count();
+
+        report.push_str("📊 Unified Decision Distribution:\n");
+        report.push_str(&format!("  • Continue Recursion: {} ({:.1}%)\n", continue_count, (continue_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • RIP Constraint Halt: {} ({:.1}%)\n", rip_halt_count, (rip_halt_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • RIC Consensus Halt: {} ({:.1}%)\n", ric_halt_count, (ric_halt_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Pathogen Detection Halt: {} ({:.1}%)\n", pathogen_halt_count, (pathogen_halt_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Loop Saturation Halt: {} ({:.1}%)\n", saturation_halt_count, (saturation_halt_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Unified Continuity Floor: {} ({:.1}%)\n\n", floor_count, (floor_count as f32 / total_decisions) * 100.0));
+
+        // Protocol health analysis
+        let avg_fusion_health = recent_history.iter().map(|e| e.overall_fusion_health).sum::<f32>() / total_decisions;
+        let avg_rip_genome = recent_history.iter().map(|e| e.rip_genome_health).sum::<f32>() / total_decisions;
+        let avg_rip_guard = recent_history.iter().map(|e| e.rip_guard_health).sum::<f32>() / total_decisions;
+        let avg_pathogen_threat = recent_history.iter().map(|e| e.rip_pathogen_threat).sum::<f32>() / total_decisions;
+        let avg_ric_consensus = recent_history.iter().map(|e| e.ric_consensus_health).sum::<f32>() / total_decisions;
+        let avg_ric_saturation = recent_history.iter().map(|e| e.ric_saturation_level).sum::<f32>() / total_decisions;
+
+        report.push_str("🏥 Protocol Health Metrics:\n");
+        report.push_str(&format!("  • Overall Fusion Health: {:.2}\n", avg_fusion_health));
+        report.push_str(&format!("  • RIP Constraint Genome: {:.2}\n", avg_rip_genome));
+        report.push_str(&format!("  • RIP Guard Chain: {:.2}\n", avg_rip_guard));
+        report.push_str(&format!("  • RIP Pathogen Threat: {:.2}\n", avg_pathogen_threat));
+        report.push_str(&format!("  • RIC Consensus Health: {:.2}\n", avg_ric_consensus));
+        report.push_str(&format!("  • RIC Saturation Level: {:.2}\n\n", avg_ric_saturation));
+
+        // Recursion budget analysis
+        let avg_budget = recent_history.iter().map(|e| e.current_recursion_budget as f32).sum::<f32>() / total_decisions;
+        let budget_exhausted_count = recent_history.iter().filter(|e| e.current_recursion_budget == 0).count();
+        let process_failure_count = recent_history.iter().filter(|e| !e.rip_process_healthy).count();
+        let saturation_detected_count = recent_history.iter().filter(|e| e.loop_saturation_detected).count();
+
+        report.push_str("⚡ System Performance:\n");
+        report.push_str(&format!("  • Average Recursion Budget: {:.1}\n", avg_budget));
+        report.push_str(&format!("  • Budget Exhausted: {} ({:.1}%)\n", budget_exhausted_count, (budget_exhausted_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • RIP Process Failures: {} ({:.1}%)\n", process_failure_count, (process_failure_count as f32 / total_decisions) * 100.0));
+        report.push_str(&format!("  • Loop Saturation Detected: {} ({:.1}%)\n\n", saturation_detected_count, (saturation_detected_count as f32 / total_decisions) * 100.0));
+
+        // Protocol effectiveness assessment
+        let halt_rate = (rip_halt_count + ric_halt_count + pathogen_halt_count + saturation_halt_count) as f32 / total_decisions;
+        let protection_efficacy = if pathogen_halt_count > 0 || saturation_halt_count > 0 {
+            "🛡️ ACTIVE"
+        } else {
+            "🟢 STABLE"
+        };
+
+        report.push_str("🎯 Protocol Effectiveness:\n");
+        report.push_str(&format!("  • Intervention Rate: {:.1}%\n", halt_rate * 100.0));
+        report.push_str(&format!("  • Protection Status: {}\n", protection_efficacy));
+        report.push_str(&format!("  • Overall Protocol Status: {}\n\n",
+            match avg_fusion_health {
+                h if h >= 0.8 => "🟢 EXCELLENT",
+                h if h >= 0.6 => "🟡 GOOD",
+                h if h >= 0.4 => "🟠 MODERATE",
+                h if h >= 0.2 => "🔴 POOR",
+                _ => "🚨 CRITICAL"
+            }));
+
+        // Recent fusion activity
+        report.push_str("📋 Recent Fusion Activity:\n");
+        for entry in recent_history.iter().rev().take(5) {
+            report.push_str(&format!("  • {}\n", entry.format_for_text()));
+        }
+
+        Ok(report)
+    }
+
+    /// Clears all RIP+RIC fusion logs
+    pub fn clear_fusion_logs(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.rip_ric_fusion_log_path.exists() {
+            std::fs::remove_file(&self.rip_ric_fusion_log_path)?;
+        }
+        if self.rip_ric_fusion_json_path.exists() {
+            std::fs::remove_file(&self.rip_ric_fusion_json_path)?;
+        }
+        Ok(())
+    }
 }
 
 impl Default for StabilityLogger {
@@ -407,6 +1096,39 @@ pub fn log_stability_update(
     context: Option<serde_json::Value>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     global_stability_logger().log_stability_update(chapter, state, warnings, injection_performed, context)
+}
+
+/// Convenience function to log RIC decision using global logger
+pub fn log_ric_decision(
+    chapter: u32,
+    decision: RICDecision,
+    votes: &[(String, InsightStatus)],
+    ric_mode: RICMode,
+    intervention_count: u32,
+    saturated_systems: Vec<String>,
+    reason: String,
+    context: Option<serde_json::Value>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    global_stability_logger().log_ric_decision(
+        chapter, decision, votes, ric_mode, intervention_count,
+        saturated_systems, reason, context
+    )
+}
+
+/// Convenience function to log RIP+RIC fusion decision using global logger
+pub fn log_rip_ric_fusion(
+    chapter: u32,
+    scene: Option<u32>,
+    decision: UnifiedArbitrationDecision,
+    fusion_health: RIPRICFusionHealth,
+    analyzed_text: String,
+    narrative_context: String,
+    context: Option<serde_json::Value>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    global_stability_logger().log_rip_ric_fusion(
+        chapter, scene, decision, fusion_health, analyzed_text,
+        narrative_context, context
+    )
 }
 
 #[cfg(test)]

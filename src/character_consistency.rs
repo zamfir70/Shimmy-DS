@@ -12,6 +12,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use crate::recursive_integrity_core::{
+    RecursiveIntegrityCore, RICMode, InsightStatus,
+    LoopSaturationController, RICStatus, CharacterDriftClamp
+};
 
 /// Represents a character's core personality trait
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -164,6 +168,12 @@ pub struct CharacterConsistencyEngine {
     pub global_consistency: f32,
     /// Last update timestamp
     pub last_updated: DateTime<Utc>,
+    /// RIC loop saturation controller
+    #[serde(skip)]
+    pub saturation_controller: Option<LoopSaturationController>,
+    /// Character drift threshold clamp
+    #[serde(skip)]
+    pub drift_clamp: Option<CharacterDriftClamp>,
 }
 
 /// A detected consistency violation
@@ -202,6 +212,8 @@ impl CharacterConsistencyEngine {
             current_chapter: 1,
             global_consistency: 1.0,
             last_updated: Utc::now(),
+            saturation_controller: Some(LoopSaturationController::new(8, "CHARACTER_CONSISTENCY".to_string())),
+            drift_clamp: Some(CharacterDriftClamp::new(0.05)), // 5% drift noise floor
         }
     }
 
@@ -601,6 +613,412 @@ pub struct CharacterIssueReport {
     pub violation_count: usize,
     pub most_severe_violation: Option<String>,
     pub recommendations: Vec<String>,
+}
+
+/// RIP+RIC character pathogen types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CharacterPathogen {
+    VoiceDrift {
+        severity: f32,
+        expected_pattern: String,
+        detected_pattern: String,
+    },
+    PersonalityInversion {
+        severity: f32,
+        inverted_trait: String,
+        contradictory_action: String,
+    },
+    MotivationDrift {
+        severity: f32,
+        established_motivations: Vec<String>,
+        drifting_action: String,
+    },
+    ArcRegression {
+        severity: f32,
+        arc_theme: String,
+        regressive_action: String,
+        progress_lost: f32,
+    },
+    RelationshipViolation {
+        severity: f32,
+        violated_relationship: String,
+        violating_action: String,
+        trust_damage: f32,
+    },
+}
+
+impl CharacterPathogen {
+    pub fn severity(&self) -> f32 {
+        match self {
+            CharacterPathogen::VoiceDrift { severity, .. } => *severity,
+            CharacterPathogen::PersonalityInversion { severity, .. } => *severity,
+            CharacterPathogen::MotivationDrift { severity, .. } => *severity,
+            CharacterPathogen::ArcRegression { severity, .. } => *severity,
+            CharacterPathogen::RelationshipViolation { severity, .. } => *severity,
+        }
+    }
+}
+
+/// RIP constraint genome violations for characters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterConstraintViolation {
+    pub violation_type: String,
+    pub severity: f32,
+    pub description: String,
+    pub constraint_genome_impact: f32,
+}
+
+/// Comprehensive RIP+RIC character analysis result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterRIPAnalysis {
+    pub character_name: String,
+    pub voice_consistency: f32,
+    pub action_consistency: f32,
+    pub pathogen_detections: Vec<CharacterPathogen>,
+    pub constraint_violations: Vec<CharacterConstraintViolation>,
+    pub unified_vote: String,
+    pub analysis_timestamp: DateTime<Utc>,
+}
+
+/// RIP+RIC character health summary
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterRIPHealth {
+    pub character_name: String,
+    pub voice_consistency_health: f32,
+    pub personality_ligand_health: f32,
+    pub arc_momentum_health: f32,
+    pub relationship_constraint_health: f32,
+    pub overall_character_health: f32,
+    pub pathogen_threat_level: f32,
+    pub constraint_violations_count: usize,
+    pub ric_saturation_status: RICStatus,
+    pub last_analysis: DateTime<Utc>,
+}
+
+impl CharacterConsistencyEngine {
+    /// RIC Integration: Check if character drift is significant enough to report
+    pub fn check_character_drift(&mut self, character_id: &str, drift_value: f32, ric_mode: RICMode) -> bool {
+        // Check saturation controller first
+        if let Some(ref mut controller) = self.saturation_controller {
+            if !controller.consume_iteration() {
+                return false; // Can't process more drift checks
+            }
+        }
+
+        // Use drift clamp to filter noise
+        if let Some(ref mut clamp) = self.drift_clamp {
+            let is_significant = clamp.is_significant_drift(character_id, drift_value);
+
+            match ric_mode {
+                RICMode::Passive => {
+                    // Always record but never block
+                    false
+                }
+                RICMode::Moderate | RICMode::Active => {
+                    is_significant
+                }
+            }
+        } else {
+            // No drift clamp - use simple threshold
+            drift_value.abs() > 0.05
+        }
+    }
+
+    /// Get current RIC status for character consistency
+    pub fn get_ric_status(&self) -> RICStatus {
+        if let Some(ref controller) = self.saturation_controller {
+            controller.status()
+        } else {
+            RICStatus::Healthy
+        }
+    }
+
+    /// Vote on current character consistency state for RIC arbitration
+    pub fn vote_on_consistency_state(&self) -> InsightStatus {
+        // Check global consistency health
+        if self.global_consistency < 0.5 {
+            InsightStatus::Block
+        } else if self.global_consistency < 0.7 {
+            InsightStatus::Suggest
+        } else if let Some(ref controller) = self.saturation_controller {
+            if controller.is_saturated() {
+                InsightStatus::Stalled
+            } else {
+                InsightStatus::Continue
+            }
+        } else {
+            InsightStatus::Continue
+        }
+    }
+
+    /// Reset RIC-related state
+    pub fn reset_ric_state(&mut self) {
+        self.saturation_controller = Some(LoopSaturationController::new(8, "CHARACTER_CONSISTENCY".to_string()));
+        self.drift_clamp = Some(CharacterDriftClamp::new(0.05));
+    }
+
+    /// Get character drift trend for specific character
+    pub fn get_character_drift_trend(&self, character_id: &str) -> f32 {
+        if let Some(ref clamp) = self.drift_clamp {
+            clamp.get_drift_trend(character_id)
+        } else {
+            0.0
+        }
+    }
+
+    /// Mark significant insight gained (resets saturation)
+    pub fn mark_insight_gained(&mut self) {
+        if let Some(ref mut controller) = self.saturation_controller {
+            controller.reset_on_insight();
+        }
+    }
+
+    /// RIP+RIC FUSION: Enhanced character analysis with pathogen detection
+    pub fn analyze_character_with_rip_fusion(&mut self, character_name: &str, dialogue: &str, action: &str, context: &str) -> CharacterRIPAnalysis {
+        // Perform standard character analysis
+        let voice_consistency = self.analyze_voice_consistency(character_name, dialogue);
+        let action_consistency = self.check_action_consistency(character_name, action, context);
+
+        // RIP pathogen detection patterns for character inconsistency
+        let pathogen_analysis = self.detect_character_pathogens(character_name, dialogue, action);
+
+        // RIP constraint genome validation for character growth
+        let constraint_validation = self.validate_character_constraints(character_name, action, context);
+
+        // Generate unified RIP+RIC vote
+        let rip_ric_vote = self.generate_character_rip_ric_vote(
+            voice_consistency,
+            action_consistency,
+            &pathogen_analysis,
+            &constraint_validation
+        );
+
+        CharacterRIPAnalysis {
+            character_name: character_name.to_string(),
+            voice_consistency,
+            action_consistency,
+            pathogen_detections: pathogen_analysis,
+            constraint_violations: constraint_validation,
+            unified_vote: rip_ric_vote,
+            analysis_timestamp: Utc::now(),
+        }
+    }
+
+    /// Detect character-specific pathogen patterns
+    fn detect_character_pathogens(&self, character_name: &str, dialogue: &str, action: &str) -> Vec<CharacterPathogen> {
+        let mut pathogens = Vec::new();
+
+        if let Some(character) = self.characters.get(character_name) {
+            // Pathogen Type 1: Voice Drift Pathogen
+            let expected_vocab = &character.dialogue_pattern.vocabulary_level;
+            let dialogue_lower = dialogue.to_lowercase();
+
+            if expected_vocab == "formal" && dialogue_lower.contains(&["like", "whatever", "dude", "gonna"].iter().map(|s| s.to_string()).collect::<Vec<String>>().join("|")) {
+                pathogens.push(CharacterPathogen::VoiceDrift {
+                    severity: 0.8,
+                    expected_pattern: expected_vocab.clone(),
+                    detected_pattern: "casual_contamination".to_string(),
+                });
+            }
+
+            // Pathogen Type 2: Personality Inversion Pathogen
+            for (trait_name, trait_data) in &character.personality_traits {
+                for contradiction in &trait_data.contradictions {
+                    if action.to_lowercase().contains(&contradiction.to_lowercase()) {
+                        pathogens.push(CharacterPathogen::PersonalityInversion {
+                            severity: trait_data.intensity * trait_data.stability,
+                            inverted_trait: trait_name.clone(),
+                            contradictory_action: action.to_string(),
+                        });
+                    }
+                }
+            }
+
+            // Pathogen Type 3: Motivation Drift Pathogen
+            let action_lower = action.to_lowercase();
+            let has_motivation_alignment = character.motivations.iter()
+                .any(|motivation| action_lower.contains(&motivation.to_lowercase()));
+
+            if !has_motivation_alignment && !character.motivations.is_empty() {
+                pathogens.push(CharacterPathogen::MotivationDrift {
+                    severity: 0.6,
+                    established_motivations: character.motivations.clone(),
+                    drifting_action: action.to_string(),
+                });
+            }
+
+            // Pathogen Type 4: Arc Regression Pathogen
+            if let Some(arc) = &character.character_arc {
+                if arc.current_progress > 0.3 && action_lower.contains(&["retreat", "give up", "abandon"].iter().map(|s| s.to_string()).collect::<Vec<String>>().join("|")) {
+                    pathogens.push(CharacterPathogen::ArcRegression {
+                        severity: arc.current_progress * 0.7,
+                        arc_theme: arc.arc_theme.clone(),
+                        regressive_action: action.to_string(),
+                        progress_lost: 0.1,
+                    });
+                }
+            }
+
+            // Pathogen Type 5: Relationship Violation Pathogen
+            for (other_char, _) in &character.relationships {
+                if action_lower.contains(&format!("betray {}", other_char.to_lowercase())) ||
+                   action_lower.contains(&format!("attack {}", other_char.to_lowercase())) {
+                    if let Some(relationship_id) = character.relationships.get(other_char) {
+                        if let Some(relationship) = self.relationships.get(relationship_id) {
+                            if relationship.trust_level > 0.5 {
+                                pathogens.push(CharacterPathogen::RelationshipViolation {
+                                    severity: relationship.trust_level,
+                                    violated_relationship: other_char.clone(),
+                                    violating_action: action.to_string(),
+                                    trust_damage: 0.3,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        pathogens
+    }
+
+    /// Validate character actions against constraint genome (RIP integration)
+    fn validate_character_constraints(&self, character_name: &str, action: &str, context: &str) -> Vec<CharacterConstraintViolation> {
+        let mut violations = Vec::new();
+
+        if let Some(character) = self.characters.get(character_name) {
+            // Constraint 1: Core Personality Ligand Anchor
+            let personality_anchor_strength = character.personality_traits.values()
+                .map(|trait| trait.intensity * trait.stability)
+                .sum::<f32>() / character.personality_traits.len().max(1) as f32;
+
+            if personality_anchor_strength < 0.4 {
+                violations.push(CharacterConstraintViolation {
+                    violation_type: "weak_personality_ligand".to_string(),
+                    severity: 1.0 - personality_anchor_strength,
+                    description: "Character personality ligands too weak to anchor consistent behavior".to_string(),
+                    constraint_genome_impact: 0.3,
+                });
+            }
+
+            // Constraint 2: Narrative Role Constraint
+            let role_expectations = match character.role.as_str() {
+                "protagonist" => vec!["hero", "save", "protect", "brave"],
+                "antagonist" => vec!["oppose", "block", "threaten", "scheme"],
+                "mentor" => vec!["guide", "teach", "advise", "support"],
+                _ => vec![]
+            };
+
+            let action_lower = action.to_lowercase();
+            let role_alignment = role_expectations.iter()
+                .any(|expectation| action_lower.contains(expectation));
+
+            if !role_alignment && !role_expectations.is_empty() {
+                violations.push(CharacterConstraintViolation {
+                    violation_type: "role_constraint_violation".to_string(),
+                    severity: 0.5,
+                    description: format!("Action '{}' doesn't align with {} role expectations", action, character.role),
+                    constraint_genome_impact: 0.2,
+                });
+            }
+
+            // Constraint 3: Character Arc Momentum Constraint
+            if let Some(arc) = &character.character_arc {
+                let expected_progression = arc.current_progress + 0.05; // Expected minimal progression
+                let action_supports_arc = action_lower.contains(&arc.arc_theme.to_lowercase()) ||
+                                        action_lower.contains(&arc.desired_end_state.to_lowercase());
+
+                if !action_supports_arc && arc.current_progress < 0.8 {
+                    violations.push(CharacterConstraintViolation {
+                        violation_type: "arc_momentum_violation".to_string(),
+                        severity: (0.8 - arc.current_progress) * 0.6,
+                        description: format!("Action doesn't support {} arc momentum", arc.arc_theme),
+                        constraint_genome_impact: 0.15,
+                    });
+                }
+            }
+
+            // Constraint 4: Dialogue Consistency Ligand
+            let dialogue_ligand_strength = character.dialogue_pattern.consistency_score;
+            if dialogue_ligand_strength < 0.6 {
+                violations.push(CharacterConstraintViolation {
+                    violation_type: "dialogue_ligand_weakness".to_string(),
+                    severity: 1.0 - dialogue_ligand_strength,
+                    description: "Character dialogue ligand too weak for consistent voice anchoring".to_string(),
+                    constraint_genome_impact: 0.25,
+                });
+            }
+        }
+
+        violations
+    }
+
+    /// Generate unified RIP+RIC vote for character state
+    fn generate_character_rip_ric_vote(&self, voice_consistency: f32, action_consistency: f32, pathogens: &[CharacterPathogen], constraints: &[CharacterConstraintViolation]) -> String {
+        // Calculate component health scores
+        let voice_health = voice_consistency;
+        let action_health = action_consistency;
+        let pathogen_threat = pathogens.iter().map(|p| p.severity()).sum::<f32>() / pathogens.len().max(1) as f32;
+        let constraint_health = 1.0 - (constraints.iter().map(|c| c.severity).sum::<f32>() / constraints.len().max(1) as f32);
+
+        // Unified health calculation
+        let character_health = (voice_health + action_health + (1.0 - pathogen_threat) + constraint_health) / 4.0;
+
+        // Generate vote based on unified health
+        match character_health {
+            h if h > 0.85 => "CHARACTER_VOTE_CONTINUE_EXCELLENT".to_string(),
+            h if h > 0.7 => "CHARACTER_VOTE_CONTINUE_GOOD".to_string(),
+            h if h > 0.5 => "CHARACTER_VOTE_CAUTION_MODERATE_ISSUES".to_string(),
+            h if h > 0.3 => "CHARACTER_VOTE_HALT_SERIOUS_ISSUES".to_string(),
+            _ => "CHARACTER_VOTE_HALT_CRITICAL_BREAKDOWN".to_string()
+        }
+    }
+
+    /// Get comprehensive RIP+RIC character health summary
+    pub fn get_rip_ric_character_health(&self, character_name: &str) -> Option<CharacterRIPHealth> {
+        if let Some(character) = self.characters.get(character_name) {
+            // Calculate component health scores
+            let voice_health = character.dialogue_pattern.consistency_score;
+            let personality_health = character.personality_traits.values()
+                .map(|trait| trait.intensity * trait.stability)
+                .sum::<f32>() / character.personality_traits.len().max(1) as f32;
+
+            let arc_health = if let Some(arc) = &character.character_arc {
+                arc.consistency_with_theme
+            } else {
+                1.0 // No arc means no arc problems
+            };
+
+            let relationship_health = {
+                let mut total_health = 0.0;
+                let mut count = 0;
+                for relationship_id in character.relationships.values() {
+                    if let Some(relationship) = self.relationships.get(relationship_id) {
+                        total_health += (relationship.trust_level + 1.0) / 2.0; // Normalize -1,1 to 0,1
+                        count += 1;
+                    }
+                }
+                if count > 0 { total_health / count as f32 } else { 1.0 }
+            };
+
+            let overall_character_health = (voice_health + personality_health + arc_health + relationship_health) / 4.0;
+
+            Some(CharacterRIPHealth {
+                character_name: character_name.to_string(),
+                voice_consistency_health: voice_health,
+                personality_ligand_health: personality_health,
+                arc_momentum_health: arc_health,
+                relationship_constraint_health: relationship_health,
+                overall_character_health,
+                pathogen_threat_level: 0.0, // Would need actual pathogen scan
+                constraint_violations_count: 0, // Would need actual constraint analysis
+                ric_saturation_status: self.get_ric_status(),
+                last_analysis: Utc::now(),
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for CharacterConsistencyEngine {

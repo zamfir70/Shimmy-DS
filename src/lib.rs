@@ -41,6 +41,9 @@ pub mod character_consistency;
 pub mod reader_engagement_loops;
 pub mod recursive_narrative_assistant;
 
+// SHIMMY-DS Recursive Integrity Core (RIC v1.0)
+pub mod recursive_integrity_core;
+
 #[cfg(test)]
 pub mod tests;
 

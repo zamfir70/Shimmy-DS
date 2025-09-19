@@ -12,6 +12,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+use crate::recursive_integrity_core::{
+    RecursiveIntegrityCore, RICMode, InsightStatus, CAPRReturnDecision,
+    LoopSaturationController, RICStatus
+};
 
 /// The four base units of narrative DNA
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -204,6 +208,13 @@ pub struct NarrativeDNATracker {
     pub current_chapter: u32,
     /// Last update timestamp
     pub last_updated: DateTime<Utc>,
+    /// RIC loop saturation controller
+    #[serde(skip)]
+    pub saturation_controller: Option<LoopSaturationController>,
+    /// CAPR loop tracking for return clamp
+    pub capr_loop_counts: HashMap<String, u32>,
+    /// Maximum returns allowed without transformation
+    pub max_capr_returns: u32,
 }
 
 impl NarrativeDNATracker {
@@ -214,6 +225,9 @@ impl NarrativeDNATracker {
             id_index: HashMap::new(),
             current_chapter: 1,
             last_updated: Utc::now(),
+            saturation_controller: Some(LoopSaturationController::new(10, "CAPR_DNA".to_string())),
+            capr_loop_counts: HashMap::new(),
+            max_capr_returns: 5,
         }
     }
 
@@ -456,6 +470,73 @@ impl NarrativeDNATracker {
         }
 
         report
+    }
+
+    /// RIC Integration: Check if CAPR loop should be allowed to continue
+    pub fn check_capr_return_permission(&mut self, loop_id: &str, has_transformation: bool) -> CAPRReturnDecision {
+        // Check saturation controller first
+        if let Some(ref mut controller) = self.saturation_controller {
+            if !controller.consume_iteration() {
+                return CAPRReturnDecision::Stalled;
+            }
+        }
+
+        // Update loop count
+        let count = self.capr_loop_counts.entry(loop_id.to_string()).or_insert(0);
+        *count += 1;
+
+        // Apply CAPR return clamp logic
+        if *count > self.max_capr_returns && !has_transformation {
+            CAPRReturnDecision::Stalled
+        } else {
+            CAPRReturnDecision::Allow
+        }
+    }
+
+    /// Mark that a CAPR loop has achieved transformation
+    pub fn mark_capr_transformation(&mut self, loop_id: &str) {
+        // Reset loop count when transformation occurs
+        self.capr_loop_counts.remove(loop_id);
+
+        // Reset saturation controller on insight
+        if let Some(ref mut controller) = self.saturation_controller {
+            controller.reset_on_insight();
+        }
+    }
+
+    /// Get current RIC status for this tracker
+    pub fn get_ric_status(&self) -> RICStatus {
+        if let Some(ref controller) = self.saturation_controller {
+            controller.status()
+        } else {
+            RICStatus::Healthy
+        }
+    }
+
+    /// Vote on current narrative state for RIC arbitration
+    pub fn vote_on_narrative_state(&self) -> InsightStatus {
+        // Check for potential infinite loops
+        let max_loop_count = self.capr_loop_counts.values().max().copied().unwrap_or(0);
+
+        if max_loop_count > self.max_capr_returns {
+            InsightStatus::Block
+        } else if max_loop_count > self.max_capr_returns / 2 {
+            InsightStatus::Suggest
+        } else if let Some(ref controller) = self.saturation_controller {
+            if controller.is_saturated() {
+                InsightStatus::Stalled
+            } else {
+                InsightStatus::Continue
+            }
+        } else {
+            InsightStatus::Continue
+        }
+    }
+
+    /// Reset all RIC-related state
+    pub fn reset_ric_state(&mut self) {
+        self.capr_loop_counts.clear();
+        self.saturation_controller = Some(LoopSaturationController::new(10, "CAPR_DNA".to_string()));
     }
 }
 

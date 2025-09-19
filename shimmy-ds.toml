@@ -98,3 +98,247 @@ enable_drift_injection = true
 
 # Enable detailed stability logging
 enable_stability_logging = true
+
+[recursive_integrity_core]
+# Enable/disable Recursive Integrity Core (RIC v1.0)
+enabled = true
+
+# RIC assertiveness mode: "Passive", "Moderate", or "Active"
+# Passive = Log only, never interfere
+# Moderate = Annotate issues, provide warnings and suggestions
+# Active = Block or reroute recursion to prevent problems
+mode = "Passive"
+
+# Loop saturation budgets for each subsystem
+[recursive_integrity_core.saturation_budgets]
+dna_tracker = 10         # CAPR loop iterations before saturation
+constraint_tracker = 8   # Constraint analysis iterations
+recursion_tracker = 12   # Multi-level recursion iterations
+character_engine = 8     # Character consistency iterations
+engagement_tracker = 6   # Reader engagement iterations
+
+# CAPR return clamp settings
+[recursive_integrity_core.capr_clamp]
+max_returns = 5          # Maximum CAPR returns without transformation
+enable_transformation_tracking = true
+
+# Character drift filtering
+[recursive_integrity_core.character_drift]
+noise_floor = 0.05       # Ignore drift below 5% threshold
+enable_trend_analysis = true
+
+# Arbitration engine settings
+[recursive_integrity_core.arbitration]
+consensus_threshold = 2  # Minimum systems required to agree for blocking
+enable_vote_logging = true
+
+# Continuity floor settings
+[recursive_integrity_core.continuity_floor]
+enable_floor_injection = true
+default_summary = "Recursive pressure saturated. Obligations fulfilled by summary."
+
+# RIC logging configuration
+[recursive_integrity_core.logging]
+enable_ric_logging = true
+ric_log_path = "logs/ric.log"
+ric_json_log_path = "logs/ric.json"
+max_memory_entries = 100
+
+# Performance tuning
+[recursive_integrity_core.performance]
+enable_parallel_voting = true
+vote_timeout_ms = 1000
+enable_health_monitoring = true
+
+# RIP+RIC Unified Protocol Stack Configuration (v1.0)
+[rip_ric_unified_protocol]
+# Enable/disable unified RIP+RIC arbitration system
+enabled = true
+
+# Cross-language communication settings
+[rip_ric_unified_protocol.communication]
+# Python process timeout for RIP analysis (milliseconds)
+python_process_timeout_ms = 5000
+
+# Enable/disable RIP Python subprocess health monitoring
+enable_process_health_monitoring = true
+
+# Maximum retries for failed RIP processes
+max_rip_process_retries = 3
+
+# RIP constraint genome configuration
+[rip_ric_unified_protocol.constraint_genome]
+# Minimum health threshold for constraint genome
+min_genome_health = 0.3
+
+# Ligand anchor strength threshold
+min_ligand_strength = 0.3
+
+# Enable/disable ligand-based expansion anchoring
+enable_ligand_anchoring = true
+
+# Guard chain validation settings
+[rip_ric_unified_protocol.guard_chain]
+# Enable 4-layer guard chain validation
+enable_guard_chain = true
+
+# Entity scope validation threshold
+entity_scope_threshold = 0.6
+
+# Proof anchor validation threshold
+proof_anchor_threshold = 0.7
+
+# Emotional vector validation threshold
+emotional_vector_threshold = 0.5
+
+# Surface-depth congruence threshold
+surface_depth_threshold = 0.8
+
+# Pathogen detection configuration
+[rip_ric_unified_protocol.pathogen_detection]
+# Enable/disable pathogen detection system
+enabled = true
+
+# Pathogen threat level threshold for halting
+threat_halt_threshold = 0.8
+
+# Enable detection for specific pathogen types
+enable_voice_drift_detection = true
+enable_personality_inversion_detection = true
+enable_motivation_drift_detection = true
+enable_arc_regression_detection = true
+enable_relationship_violation_detection = true
+enable_temporal_inconsistency_detection = true
+
+# ZC (Zero-Continuation) Gate configuration
+[rip_ric_unified_protocol.zc_gates]
+# Default recursion budget for new narrative cycles
+default_recursion_budget = 20
+
+# Budget reset threshold for significant insights
+insight_reset_threshold = 0.8
+
+# Enable different gate types
+enable_surface_expansion_gate = true
+enable_deep_analysis_gate = true
+enable_character_development_gate = true
+enable_thematic_exploration_gate = true
+enable_obligation_resolution_gate = true
+
+# Loop saturation control
+[rip_ric_unified_protocol.saturation_control]
+# Enable loop saturation detection
+enabled = true
+
+# Maximum iterations before stagnation detection
+max_iterations_before_stagnation = 25
+
+# Growth phase saturation thresholds
+surface_expansion_saturation_threshold = 10
+deep_analysis_saturation_threshold = 8
+character_development_saturation_threshold = 6
+thematic_exploration_saturation_threshold = 12
+obligation_resolution_saturation_threshold = 15
+
+# Unified arbitration configuration
+[rip_ric_unified_protocol.arbitration]
+# Decision priority order (1 = highest priority)
+pathogen_detection_priority = 1
+loop_saturation_priority = 2
+rip_constraint_priority = 3
+ric_consensus_priority = 4
+
+# Consensus confidence thresholds
+high_confidence_threshold = 0.8
+medium_confidence_threshold = 0.6
+low_confidence_threshold = 0.4
+
+# Enable fail-closed protection
+enable_fail_closed_protection = true
+
+# Character fusion configuration
+[rip_ric_unified_protocol.character_fusion]
+# Enable RIP+RIC character analysis fusion
+enabled = true
+
+# Character pathogen detection thresholds
+voice_drift_threshold = 0.7
+personality_inversion_threshold = 0.8
+motivation_drift_threshold = 0.6
+arc_regression_threshold = 0.7
+relationship_violation_threshold = 0.8
+
+# Character constraint validation thresholds
+personality_ligand_min_strength = 0.4
+role_alignment_threshold = 0.6
+arc_momentum_threshold = 0.5
+dialogue_consistency_threshold = 0.6
+
+# Unified protocol logging
+[rip_ric_unified_protocol.logging]
+# Enable/disable unified protocol logging
+enabled = true
+
+# Log file paths
+fusion_log_path = "logs/rip_ric_fusion.log"
+fusion_json_log_path = "logs/rip_ric_fusion.json"
+
+# Detailed logging for specific decision types
+enable_pathogen_halt_details = true
+enable_saturation_halt_details = true
+enable_continuity_floor_details = true
+
+# Performance and health monitoring
+[rip_ric_unified_protocol.monitoring]
+# Enable real-time fusion health monitoring
+enable_fusion_health_monitoring = true
+
+# Health assessment interval (seconds)
+health_assessment_interval_sec = 30
+
+# Enable performance metrics collection
+enable_performance_metrics = true
+
+# Health warning thresholds
+fusion_health_warning_threshold = 0.4
+fusion_health_critical_threshold = 0.2
+
+# Process recovery configuration
+[rip_ric_unified_protocol.recovery]
+# Enable automatic recovery for failed processes
+enable_auto_recovery = true
+
+# Recovery strategies priority order
+recovery_strategies = [
+    "rip_process_restart",
+    "constraint_genome_reset",
+    "recursion_budget_reset",
+    "unified_continuity_floor"
+]
+
+# Recovery attempt limits
+max_recovery_attempts = 3
+recovery_cooldown_sec = 60
+
+# Emergency continuity floor configuration
+[rip_ric_unified_protocol.continuity_floor]
+# Enable unified continuity floor
+enabled = true
+
+# Conditions that trigger continuity floor
+trigger_on_process_failure = true
+trigger_on_critical_health = true
+trigger_on_pathogen_overload = true
+trigger_on_budget_exhaustion = true
+
+# Floor engagement thresholds
+process_failure_threshold = 2      # Failed RIP processes
+critical_health_threshold = 0.15   # Overall fusion health
+pathogen_overload_threshold = 0.9  # Pathogen threat level
+budget_exhaustion_threshold = 0    # Remaining recursion budget
+
+# Default continuity messages
+rip_failure_message = "RIP constraint analysis encountered critical errors - stabilizing via continuity floor"
+ric_saturation_message = "RIC subsystem consensus saturated - completing narrative obligations via summary"
+pathogen_overload_message = "Pathogen contamination exceeds safe thresholds - narrative integrity protected via floor"
+unified_failure_message = "Unified protocol integrity compromised - engaging emergency narrative completion"
