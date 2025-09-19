@@ -11,6 +11,14 @@ use std::time::SystemTime;
 
 pub mod model_cache;
 
+// CacheMind cross-system state cache
+pub mod lru;
+pub mod cachemind;
+
+// Re-export CacheMind components for easier access
+pub use cachemind::{CacheMind, ConstraintSnapshot, CAPRPathSummary, CharacterEmotionArc};
+pub use lru::LRUCache;
+
 /// Cached metadata for a model file
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModelMetadata {

@@ -10,6 +10,7 @@ use crate::recursive_integrity_core::{
 use crate::recursive_narrative_assistant::{
     UnifiedArbitrationDecision, RIPRICFusionHealth
 };
+use crate::telemetry::{PulseTrace, Pulse, PulseTraceHealthStats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
@@ -1131,6 +1132,263 @@ pub fn log_rip_ric_fusion(
     )
 }
 
+/// Telemetry integration helpers for stability logging
+pub mod telemetry_integration {
+    use super::*;
+
+    /// Creates a pulse from stability log entry data
+    pub fn create_pulse_from_stability_entry(
+        entry: &StabilityLogEntry,
+        zc_tick: usize,
+    ) -> Pulse {
+        let drift_hits = if entry.warnings.is_some() { 1 } else { 0 };
+        let pathogens_detected = entry.stability_state.stale_obligations;
+
+        // Calculate ADI score based on stability metrics
+        let adi_score = calculate_stability_adi_score(&entry.stability_state);
+
+        // Affect signals based on stability
+        let affect_pleasure = if entry.injection_performed { -0.2 } else { 0.1 };
+        let affect_coherence = 1.0 - entry.stability_state.theme_drift_score;
+
+        Pulse::with_data(
+            zc_tick,
+            pathogens_detected,
+            drift_hits,
+            adi_score,
+            50.0, // Default memory estimate
+            affect_pleasure,
+            affect_coherence.max(0.0).min(1.0),
+            Some(format!("Stability log Ch.{} - injection:{}", entry.chapter, entry.injection_performed))
+        )
+    }
+
+    /// Creates a pulse from RIC log entry data
+    pub fn create_pulse_from_ric_entry(
+        entry: &RICLogEntry,
+        zc_tick: usize,
+    ) -> Pulse {
+        let drift_hits = entry.saturated_systems.len();
+        let pathogens_detected = entry.intervention_count as usize;
+
+        // RIC-based ADI score
+        let adi_score = match entry.decision.as_str() {
+            "CONTINUE" => 0.8,
+            "CAUTION" => 0.5,
+            "HALT" => 0.2,
+            _ => 0.4,
+        };
+
+        // Affect based on RIC decision
+        let affect_pleasure = match entry.decision.as_str() {
+            "CONTINUE" => 0.3,
+            "CAUTION" => 0.0,
+            "HALT" => -0.5,
+            _ => 0.0,
+        };
+
+        let affect_coherence = 1.0 - (drift_hits as f32 * 0.1);
+
+        Pulse::with_data(
+            zc_tick,
+            pathogens_detected,
+            drift_hits,
+            adi_score,
+            55.0, // Slightly higher memory estimate for RIC
+            affect_pleasure,
+            affect_coherence.max(0.0).min(1.0),
+            Some(format!("RIC {} - Ch.{} - interventions:{}", entry.decision, entry.chapter, entry.intervention_count))
+        )
+    }
+
+    /// Creates a pulse from RIP+RIC fusion data
+    pub fn create_pulse_from_fusion_data(
+        decision: &UnifiedArbitrationDecision,
+        fusion_health: &RIPRICFusionHealth,
+        chapter: u32,
+        zc_tick: usize,
+    ) -> Pulse {
+        let drift_hits = fusion_health.cross_system_conflicts;
+        let pathogens_detected = fusion_health.pathogen_detections;
+
+        // Fusion-based ADI score
+        let adi_score = fusion_health.overall_health_score * 0.8 +
+                       fusion_health.python_rust_sync_score * 0.2;
+
+        // Affect based on fusion health
+        let affect_pleasure = (fusion_health.overall_health_score - 0.5) * 2.0; // -1 to 1 range
+        let affect_coherence = fusion_health.python_rust_sync_score;
+
+        Pulse::with_data(
+            zc_tick,
+            pathogens_detected,
+            drift_hits,
+            adi_score,
+            60.0, // Higher memory estimate for fusion operations
+            affect_pleasure,
+            affect_coherence,
+            Some(format!("RIP+RIC fusion Ch.{} - health:{:.2}", chapter, fusion_health.overall_health_score))
+        )
+    }
+
+    /// Calculate ADI score from stability state
+    fn calculate_stability_adi_score(state: &DriftStabilityState) -> f32 {
+        let base_score = 0.6;
+
+        // Factor in drift metrics
+        let drift_penalty = state.theme_drift_score * 0.3;
+        let decay_penalty = (state.emotional_decay_sum / 10.0).min(0.2);
+        let stale_penalty = (state.stale_obligations as f32 * 0.05).min(0.2);
+
+        (base_score - drift_penalty - decay_penalty - stale_penalty).max(0.0).min(1.0)
+    }
+
+    /// Log Qualitier quality level change
+    pub fn log_quality_change(
+        old_level: crate::adaptive::QualityLevel,
+        new_level: crate::adaptive::QualityLevel,
+        chapter: u32,
+        memory_pressure: f32,
+        narrative_stress: f32,
+    ) {
+        let log_entry = serde_json::json!({
+            "timestamp": Utc::now().to_rfc3339(),
+            "event_type": "qualitier_quality_change",
+            "chapter": chapter,
+            "old_level": format!("{:?}", old_level),
+            "new_level": format!("{:?}", new_level),
+            "memory_pressure": memory_pressure,
+            "narrative_stress": narrative_stress,
+            "direction": if (new_level as u8) > (old_level as u8) { "upgrade" } else { "downgrade" }
+        });
+
+        // Log to console
+        log::info!("Qualitier quality change: {:?} -> {:?} (Ch.{}, mem_pressure:{:.2}, narrative_stress:{:.2})",
+            old_level, new_level, chapter, memory_pressure, narrative_stress);
+
+        // Write to stability log file if enabled
+        if let Err(e) = write_qualitier_log_entry(&log_entry) {
+            log::warn!("Failed to write Qualitier log entry: {}", e);
+        }
+    }
+
+    /// Log Qualitier performance degradation
+    pub fn log_performance_degradation(
+        reason: &str,
+        current_level: crate::adaptive::QualityLevel,
+        chapter: u32,
+        memory_usage_mb: u64,
+    ) {
+        let log_entry = serde_json::json!({
+            "timestamp": Utc::now().to_rfc3339(),
+            "event_type": "qualitier_performance_degradation",
+            "chapter": chapter,
+            "current_level": format!("{:?}", current_level),
+            "reason": reason,
+            "memory_usage_mb": memory_usage_mb
+        });
+
+        log::warn!("Qualitier performance degradation: {} (Ch.{}, level:{:?}, memory:{}MB)",
+            reason, chapter, current_level, memory_usage_mb);
+
+        if let Err(e) = write_qualitier_log_entry(&log_entry) {
+            log::warn!("Failed to write Qualitier degradation log: {}", e);
+        }
+    }
+
+    /// Log Qualitier narrative stress upgrade
+    pub fn log_narrative_stress_upgrade(
+        current_level: crate::adaptive::QualityLevel,
+        chapter: u32,
+        pathogen_count: usize,
+        adi_score: f32,
+        drift_hits: usize,
+    ) {
+        let log_entry = serde_json::json!({
+            "timestamp": Utc::now().to_rfc3339(),
+            "event_type": "qualitier_narrative_stress_upgrade",
+            "chapter": chapter,
+            "current_level": format!("{:?}", current_level),
+            "pathogen_count": pathogen_count,
+            "adi_score": adi_score,
+            "drift_hits": drift_hits
+        });
+
+        log::info!("Qualitier narrative stress upgrade: {:?} (Ch.{}, pathogens:{}, ADI:{:.2}, drift:{})",
+            current_level, chapter, pathogen_count, adi_score, drift_hits);
+
+        if let Err(e) = write_qualitier_log_entry(&log_entry) {
+            log::warn!("Failed to write Qualitier stress upgrade log: {}", e);
+        }
+    }
+
+    /// Create a pulse from Qualitier status data
+    pub fn create_pulse_from_qualitier_status(
+        status: &crate::adaptive::QualitierStatusReport,
+        chapter: u32,
+        zc_tick: usize,
+    ) -> Pulse {
+        // Convert quality level to numeric pathogen count
+        let pathogens_detected = match status.current_level {
+            crate::adaptive::QualityLevel::Minimal => 5,   // High pathogen inference
+            crate::adaptive::QualityLevel::Standard => 2,  // Moderate
+            crate::adaptive::QualityLevel::Enhanced => 1,  // Low
+            crate::adaptive::QualityLevel::Premium => 0,   // Clean
+        };
+
+        // Drift hits based on memory degradations
+        let drift_hits = if status.memory_degradations > 0 {
+            (status.memory_degradations as usize).min(5)
+        } else {
+            0
+        };
+
+        // ADI score inverse to memory pressure
+        let adi_score = (1.0 - status.memory_pressure).max(0.0).min(1.0);
+
+        // Affect based on quality level
+        let affect_pleasure = match status.current_level {
+            crate::adaptive::QualityLevel::Minimal => -0.4,
+            crate::adaptive::QualityLevel::Standard => 0.0,
+            crate::adaptive::QualityLevel::Enhanced => 0.3,
+            crate::adaptive::QualityLevel::Premium => 0.6,
+        };
+
+        // Coherence based on adaptive functioning
+        let affect_coherence = if status.adaptive_enabled { 0.8 } else { 0.5 };
+
+        Pulse::with_data(
+            zc_tick,
+            pathogens_detected,
+            drift_hits,
+            adi_score,
+            (status.memory_pressure * 100.0), // Memory usage estimate
+            affect_pleasure,
+            affect_coherence,
+            Some(format!("Qualitier {:?} Ch.{} - pressure:{:.2}",
+                status.current_level, chapter, status.memory_pressure))
+        )
+    }
+
+    /// Write Qualitier log entry to file
+    fn write_qualitier_log_entry(entry: &serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        let log_path = "logs/qualitier.json";
+
+        // Ensure logs directory exists
+        if let Some(parent) = Path::new(log_path).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)?;
+
+        writeln!(file, "{}", entry)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1343,5 +1601,288 @@ mod tests {
             .with_context(context.clone());
 
         assert_eq!(entry.context, context);
+    }
+}
+
+/// ObliSelect Smart Obligation Management Telemetry Integration
+pub mod obli_select_telemetry {
+    use super::*;
+    use crate::obligations::{ObligationScore, ObligationMetrics, ObliSelectSettings, ObligationCategory, ObligationUrgency};
+
+    /// Logs obligation selection events with detailed scoring information
+    pub fn log_obligation_selection(
+        selected_obligations: &[ObligationScore],
+        selection_performance_ms: u64,
+        chapter: u32,
+        context: &str,
+    ) {
+        let log_entry = format!(
+            "[{}] Ch.{} ObliSelect Selection: {} obligations selected in {}ms | Context: {}",
+            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            chapter,
+            selected_obligations.len(),
+            selection_performance_ms,
+            context
+        );
+
+        log::info!("{}", log_entry);
+
+        // Log detailed scoring if debug level is enabled
+        if log::log_enabled!(log::Level::Debug) {
+            for score in selected_obligations {
+                log::debug!(
+                    "  └─ {} (total:{:.3}) urgency:{:.3} salience:{:.3} fresh:{:.3} tension:{:.3} dep:{:.3} context:{:.3} | {}",
+                    score.obligation_id,
+                    score.total_score,
+                    score.urgency_score,
+                    score.salience_score,
+                    score.freshness_score,
+                    score.tension_balance_score,
+                    score.dependency_score,
+                    score.context_relevance_score,
+                    score.justification
+                );
+            }
+        }
+
+        // Write to JSON log for structured analysis
+        let json_entry = serde_json::json!({
+            "timestamp": Utc::now(),
+            "event_type": "obligation_selection",
+            "chapter": chapter,
+            "context": context,
+            "selection_count": selected_obligations.len(),
+            "performance_ms": selection_performance_ms,
+            "selected_obligations": selected_obligations.iter().map(|score| {
+                serde_json::json!({
+                    "obligation_id": score.obligation_id,
+                    "total_score": score.total_score,
+                    "component_scores": {
+                        "urgency": score.urgency_score,
+                        "salience": score.salience_score,
+                        "freshness": score.freshness_score,
+                        "tension_balance": score.tension_balance_score,
+                        "dependency": score.dependency_score,
+                        "context_relevance": score.context_relevance_score
+                    },
+                    "justification": score.justification
+                })
+            }).collect::<Vec<_>>()
+        });
+
+        if let Err(e) = write_json_log_entry("logs/obli_select.json", &json_entry) {
+            log::warn!("Failed to write ObliSelect JSON log: {}", e);
+        }
+    }
+
+    /// Logs obligation management metrics and health status
+    pub fn log_obligation_metrics(
+        metrics: &ObligationMetrics,
+        settings: &ObliSelectSettings,
+        chapter: u32,
+    ) {
+        let log_entry = format!(
+            "[{}] Ch.{} ObliSelect Metrics: {} total, {} stale, {} overused | Avg injection: {:.1}, Fulfillment: {:.1}%",
+            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            chapter,
+            metrics.total_obligations,
+            metrics.stale_obligations,
+            metrics.overused_obligations,
+            metrics.average_injection_count,
+            metrics.fulfillment_progress_average * 100.0
+        );
+
+        log::info!("{}", log_entry);
+
+        // Log tension distribution
+        log::debug!(
+            "  Tension Distribution: {:.1}% negative, {:.1}% neutral, {:.1}% positive",
+            metrics.tension_distribution.0 * 100.0,
+            metrics.tension_distribution.1 * 100.0,
+            metrics.tension_distribution.2 * 100.0
+        );
+
+        // Log category and urgency distributions
+        if log::log_enabled!(log::Level::Debug) {
+            log::debug!("  Category Distribution:");
+            for (category, count) in &metrics.obligations_by_category {
+                log::debug!("    {:?}: {}", category, count);
+            }
+
+            log::debug!("  Urgency Distribution:");
+            for (urgency, count) in &metrics.obligations_by_urgency {
+                log::debug!("    {:?}: {}", urgency, count);
+            }
+        }
+
+        // Write comprehensive metrics to JSON
+        let json_entry = serde_json::json!({
+            "timestamp": Utc::now(),
+            "event_type": "obligation_metrics",
+            "chapter": chapter,
+            "metrics": {
+                "total_obligations": metrics.total_obligations,
+                "stale_obligations": metrics.stale_obligations,
+                "overused_obligations": metrics.overused_obligations,
+                "average_injection_count": metrics.average_injection_count,
+                "fulfillment_progress_average": metrics.fulfillment_progress_average,
+                "tension_distribution": {
+                    "negative_percent": metrics.tension_distribution.0,
+                    "neutral_percent": metrics.tension_distribution.1,
+                    "positive_percent": metrics.tension_distribution.2
+                },
+                "dependency_chain_length_max": metrics.dependency_chain_length_max,
+                "last_selection_performance_ms": metrics.last_selection_performance_ms,
+                "obligations_by_category": metrics.obligations_by_category,
+                "obligations_by_urgency": metrics.obligations_by_urgency
+            },
+            "settings": {
+                "max_obligations_per_selection": settings.max_obligations_per_selection,
+                "weights": {
+                    "urgency": settings.urgency_weight,
+                    "salience": settings.salience_weight,
+                    "freshness": settings.freshness_weight,
+                    "tension_balance": settings.tension_balance_weight,
+                    "dependency": settings.dependency_weight,
+                    "context_relevance": settings.context_relevance_weight
+                },
+                "thresholds": {
+                    "staleness_penalty": settings.staleness_penalty_threshold,
+                    "overuse_penalty": settings.overuse_penalty_threshold,
+                    "tension_balance_target": settings.tension_balance_target
+                },
+                "features": {
+                    "adaptive_weighting": settings.enable_adaptive_weighting,
+                    "dependency_resolution": settings.enable_dependency_resolution,
+                    "contextual_filtering": settings.enable_contextual_filtering
+                }
+            }
+        });
+
+        if let Err(e) = write_json_log_entry("logs/obli_select_metrics.json", &json_entry) {
+            log::warn!("Failed to write ObliSelect metrics JSON log: {}", e);
+        }
+    }
+
+    /// Logs obligation lifecycle events (add, remove, fulfill)
+    pub fn log_obligation_lifecycle_event(
+        event_type: &str,
+        obligation_id: &str,
+        obligation_content: Option<&str>,
+        category: Option<ObligationCategory>,
+        urgency: Option<ObligationUrgency>,
+        fulfillment_progress: Option<f32>,
+        chapter: u32,
+    ) {
+        let log_entry = format!(
+            "[{}] Ch.{} ObliSelect {}: {} | Progress: {:?} | Category: {:?} | Urgency: {:?}",
+            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            chapter,
+            event_type,
+            obligation_id,
+            fulfillment_progress.map(|p| format!("{:.1}%", p * 100.0)),
+            category,
+            urgency
+        );
+
+        match event_type {
+            "ADD" => log::info!("{}", log_entry),
+            "REMOVE" | "FULFILL" => log::info!("{}", log_entry),
+            "UPDATE" => log::debug!("{}", log_entry),
+            _ => log::debug!("{}", log_entry),
+        }
+
+        // Write lifecycle event to JSON log
+        let json_entry = serde_json::json!({
+            "timestamp": Utc::now(),
+            "event_type": "obligation_lifecycle",
+            "lifecycle_event": event_type,
+            "chapter": chapter,
+            "obligation_id": obligation_id,
+            "obligation_content": obligation_content,
+            "category": category,
+            "urgency": urgency,
+            "fulfillment_progress": fulfillment_progress
+        });
+
+        if let Err(e) = write_json_log_entry("logs/obli_select_lifecycle.json", &json_entry) {
+            log::warn!("Failed to write ObliSelect lifecycle JSON log: {}", e);
+        }
+    }
+
+    /// Logs performance warnings for ObliSelect operations
+    pub fn log_performance_warning(
+        operation: &str,
+        actual_time_ms: u64,
+        threshold_ms: u64,
+        chapter: u32,
+        obligation_count: usize,
+    ) {
+        let log_entry = format!(
+            "[{}] Ch.{} ⚠️ ObliSelect Performance Warning: {} took {}ms (threshold: {}ms) | {} obligations",
+            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            chapter,
+            operation,
+            actual_time_ms,
+            threshold_ms,
+            obligation_count
+        );
+
+        log::warn!("{}", log_entry);
+
+        // Write performance warning to JSON log
+        let json_entry = serde_json::json!({
+            "timestamp": Utc::now(),
+            "event_type": "obligation_performance_warning",
+            "chapter": chapter,
+            "operation": operation,
+            "actual_time_ms": actual_time_ms,
+            "threshold_ms": threshold_ms,
+            "obligation_count": obligation_count,
+            "performance_ratio": actual_time_ms as f64 / threshold_ms as f64
+        });
+
+        if let Err(e) = write_json_log_entry("logs/obli_select_performance.json", &json_entry) {
+            log::warn!("Failed to write ObliSelect performance JSON log: {}", e);
+        }
+    }
+
+    /// Helper function to write JSON log entries
+    fn write_json_log_entry(log_path: &str, entry: &serde_json::Value) -> std::io::Result<()> {
+        // Ensure logs directory exists
+        if let Some(parent) = Path::new(log_path).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)?;
+
+        writeln!(file, "{}", entry)?;
+        Ok(())
+    }
+
+    /// Gets summary statistics for obligation management logging
+    pub fn get_logging_summary(chapter: u32) -> serde_json::Value {
+        serde_json::json!({
+            "timestamp": Utc::now(),
+            "chapter": chapter,
+            "logging_status": {
+                "obli_select_enabled": true,
+                "log_files": [
+                    "logs/obli_select.json",
+                    "logs/obli_select_metrics.json",
+                    "logs/obli_select_lifecycle.json",
+                    "logs/obli_select_performance.json"
+                ],
+                "supported_events": [
+                    "obligation_selection",
+                    "obligation_metrics",
+                    "obligation_lifecycle",
+                    "obligation_performance_warning"
+                ]
+            }
+        })
     }
 }

@@ -22,6 +22,13 @@ use crate::recursive_integrity_core::{
     RecursiveIntegrityCore, RICMode, RICDecision, InsightStatus,
     ContinuityFloorResponse, RICHealthSummary
 };
+use crate::telemetry::{PulseTrace, Pulse, PulseTraceHealthStats};
+use crate::cache::{CacheMind, ConstraintSnapshot, CAPRPathSummary, CharacterEmotionArc};
+use crate::adaptive::{
+    AdaptIQEngine, AdaptIQSettings, TasteLUT, entropy_score, estimate_cognitive_load,
+    Qualitier, QualityLevel, QualityFeature, PerformanceConfig, QualitierStatusReport
+};
+use crate::obligations::{SmartObligationManager, ObliSelectSettings, ObligationMetrics};
 
 use serde_json;
 use std::process::{Command, Stdio};
@@ -61,6 +68,29 @@ pub struct RecursiveNarrativeAssistant {
     #[serde(skip)]
     pub ric: Option<RecursiveIntegrityCore>,
 
+    /// PulseTrace telemetry logger
+    #[serde(skip)]
+    pub pulse_trace: PulseTrace,
+
+    /// CacheMind cross-system state cache
+    #[serde(skip)]
+    pub cache_mind: CacheMind,
+
+    /// AdaptIQ narrative intelligence modulator
+    #[serde(skip)]
+    pub adapt_iq_engine: Option<AdaptIQEngine>,
+
+    /// Current AdaptIQ settings
+    pub current_adapt_settings: AdaptIQSettings,
+
+    /// Qualitier adaptive quality control
+    #[serde(skip)]
+    pub qualitier: Qualitier,
+
+    /// ObliSelect smart obligation management
+    #[serde(skip)]
+    pub obli_select: SmartObligationManager,
+
     /// RIP+RIC Unified Arbitration State
     pub rip_ric_fusion_state: RIPRICFusionState,
 }
@@ -80,6 +110,14 @@ pub struct AssistantConfig {
     pub drift_config: DriftStabilizerConfig,
     /// RIC mode for integrity control
     pub ric_mode: RICMode,
+    /// AdaptIQ taste preferences
+    pub taste_profile: TasteLUT,
+    /// Enable AdaptIQ adaptive intelligence modulation
+    pub enable_adapt_iq: bool,
+    /// Qualitier performance configuration
+    pub performance_config: PerformanceConfig,
+    /// ObliSelect obligation management settings
+    pub obli_select_settings: ObliSelectSettings,
 }
 
 /// Which tracking systems are enabled
@@ -91,6 +129,8 @@ pub struct EnabledSystems {
     pub character_consistency: bool,
     pub engagement_loops: bool,
     pub drift_stabilization: bool,
+    pub adaptive_intelligence: bool,
+    pub obligation_management: bool,
 }
 
 /// Sensitivity settings for different types of insights
@@ -120,6 +160,8 @@ impl Default for AssistantConfig {
                 character_consistency: true,
                 engagement_loops: true,
                 drift_stabilization: true,
+                adaptive_intelligence: true,
+                obligation_management: true,
             },
             sensitivity: SensitivitySettings {
                 constraint_pressure: 0.7,
@@ -130,6 +172,10 @@ impl Default for AssistantConfig {
             },
             drift_config: DriftStabilizerConfig::default(),
             ric_mode: RICMode::default(),
+            taste_profile: TasteLUT::Balanced,
+            enable_adapt_iq: true,
+            performance_config: PerformanceConfig::default(),
+            obli_select_settings: ObliSelectSettings::default(),
         }
     }
 }
@@ -336,6 +382,12 @@ impl RecursiveNarrativeAssistant {
             current_scene: None,
             last_updated: Utc::now(),
             ric: Some(ric),
+            pulse_trace: PulseTrace::new(512), // 512 pulse capacity as specified
+            cache_mind: CacheMind::new(), // 128 capacity for each cache
+            adapt_iq_engine: None, // Will be initialized on first use
+            current_adapt_settings: AdaptIQSettings::default(),
+            qualitier: Qualitier::new(100, 50, true), // Default performance config
+            obli_select: SmartObligationManager::new(),
             rip_ric_fusion_state: RIPRICFusionState::new(),
         }
     }
@@ -377,6 +429,23 @@ impl RecursiveNarrativeAssistant {
 
     /// Analyzes the current narrative state and generates insights
     pub fn analyze_narrative_state(&mut self) -> Vec<NarrativeInsight> {
+        // Update AdaptIQ settings before analysis if enabled
+        if self.config.enabled_systems.adaptive_intelligence && self.config.enable_adapt_iq {
+            self.update_adaptive_settings();
+
+            // Apply Qualitier quality control
+            if let Some(recent_pulse) = self.pulse_trace.latest() {
+                let quality_changed = self.qualitier.decide(recent_pulse, &self.current_adapt_settings);
+                if quality_changed {
+                    // Log quality level change
+                    log::info!("Qualitier changed tier to {:?}", self.qualitier.current_level());
+                }
+
+                // Apply quality constraints to adaptive settings
+                self.qualitier.clamp_settings(&mut self.current_adapt_settings);
+            }
+        }
+
         let mut insights = Vec::new();
 
         // Check each system for insights
@@ -404,7 +473,18 @@ impl RecursiveNarrativeAssistant {
 
         // Sort by priority and apply assertiveness filtering
         insights.sort_by(|a, b| self.priority_value(&b.priority).cmp(&self.priority_value(&a.priority)));
-        self.filter_insights_by_assertiveness(insights)
+        let filtered_insights = self.filter_insights_by_assertiveness(insights);
+
+        // Record telemetry pulse after analysis
+        self.record_pulse_telemetry(&filtered_insights);
+
+        // Auto-cache state snapshots if significant insights detected
+        if filtered_insights.iter().any(|i| matches!(i.priority, InsightPriority::Critical | InsightPriority::Important)) {
+            self.cache_constraint_snapshot();
+            self.cache_capr_path_summary();
+        }
+
+        filtered_insights
     }
 
     /// Analyzes narrative DNA patterns
@@ -1198,6 +1278,768 @@ impl RecursiveNarrativeAssistant {
 
         report
     }
+
+    // ========== PULSE TRACE TELEMETRY METHODS ==========
+
+    /// Records a telemetry pulse capturing current narrative system state
+    fn record_pulse_telemetry(&mut self, insights: &[NarrativeInsight]) {
+        use crate::telemetry::helpers::{get_memory_usage_estimate, count_pathogens_from_results};
+
+        // Count pathogens from DNA tracker
+        let pathogen_count = if self.config.enabled_systems.dna_tracking {
+            self.dna_tracker.get_active_pathogens().len()
+        } else {
+            0
+        };
+
+        // Count drift hits from current drift state
+        let drift_hits = self.drift_state.get_drift_indicators().len();
+
+        // Calculate ADI score based on current narrative state
+        let adi_score = self.calculate_narrative_adi_score();
+
+        // Get ZC tick from RIC if available
+        let zc_tick = if let Some(ref ric) = self.ric {
+            ric.get_iteration_count() // Assuming this method exists
+        } else {
+            0
+        };
+
+        // Calculate affective signals
+        let (affect_pleasure, affect_coherence) = self.calculate_affective_signals(insights);
+
+        // Create and record pulse
+        let pulse = Pulse::with_data(
+            zc_tick,
+            pathogen_count,
+            drift_hits,
+            adi_score,
+            get_memory_usage_estimate(),
+            affect_pleasure,
+            affect_coherence,
+            Some("Narrative analysis tick complete".to_string())
+        );
+
+        self.pulse_trace.record(pulse);
+    }
+
+    /// Calculate Adaptive Depth Intelligence score based on current narrative state
+    fn calculate_narrative_adi_score(&self) -> f32 {
+        let mut score = 0.5; // Base score
+
+        // Factor in constraint pressure
+        if self.config.enabled_systems.constraint_modeling {
+            let freedom_score = self.constraint_tracker.calculate_freedom_score();
+            score += (1.0 - freedom_score) * 0.2; // More constraints = higher ADI
+        }
+
+        // Factor in character consistency
+        if self.config.enabled_systems.character_consistency {
+            let consistency = self.character_engine.global_consistency;
+            score += consistency * 0.15;
+        }
+
+        // Factor in recursion depth
+        if self.config.enabled_systems.recursion_tracking {
+            let recursion_health = self.recursion_tracker.analyze_recursion_health();
+            score += recursion_health.health_score * 0.15;
+        }
+
+        // Factor in DNA complexity
+        if self.config.enabled_systems.dna_tracking {
+            let dna_health = self.dna_tracker.analyze_pattern_health();
+            score += (dna_health.total_units as f32 * 0.01).min(0.2);
+        }
+
+        score.min(1.0)
+    }
+
+    /// Calculate affective pleasure and coherence signals
+    fn calculate_affective_signals(&self, insights: &[NarrativeInsight]) -> (f32, f32) {
+        // Pleasure signal: positive for constructive insights, negative for conflicts
+        let mut pleasure = 0.0;
+        let mut coherence = 0.5; // Base coherence
+
+        for insight in insights {
+            match insight.priority {
+                InsightPriority::Critical => {
+                    pleasure -= 0.3; // Critical issues reduce pleasure
+                    coherence -= 0.1;
+                }
+                InsightPriority::Important => {
+                    pleasure -= 0.1;
+                }
+                InsightPriority::Interesting => {
+                    pleasure += 0.1; // Interesting patterns increase pleasure
+                    coherence += 0.05;
+                }
+                InsightPriority::Minor => {
+                    pleasure += 0.05;
+                }
+            }
+        }
+
+        // Factor in engagement and consistency
+        if self.config.enabled_systems.engagement_loops {
+            let retention = self.engagement_tracker.engagement_metrics.reader_retention_score;
+            pleasure += (retention - 0.5) * 0.4; // Retention above 0.5 increases pleasure
+            coherence += retention * 0.3;
+        }
+
+        if self.config.enabled_systems.character_consistency {
+            coherence += self.character_engine.global_consistency * 0.2;
+        }
+
+        // Clamp to valid ranges
+        pleasure = pleasure.max(-1.0).min(1.0);
+        coherence = coherence.max(0.0).min(1.0);
+
+        (pleasure, coherence)
+    }
+
+    /// Get pulse trace health statistics
+    pub fn get_pulse_trace_health(&self) -> PulseTraceHealthStats {
+        self.pulse_trace.get_health_stats()
+    }
+
+    /// Get recent pulse trace summary as JSON
+    pub fn get_pulse_trace_summary(&self) -> String {
+        self.pulse_trace.to_summary_json()
+    }
+
+    /// Get full pulse trace as JSON
+    pub fn get_pulse_trace_json(&self) -> String {
+        self.pulse_trace.to_json()
+    }
+
+    /// Clear pulse trace (for testing or reset)
+    pub fn clear_pulse_trace(&mut self) {
+        self.pulse_trace.clear();
+    }
+
+    // ========================================================================
+    // CacheMind Integration Methods
+    // ========================================================================
+
+    /// Create and cache a constraint snapshot from current state
+    pub fn cache_constraint_snapshot(&mut self) -> String {
+        let snapshot = ConstraintSnapshot {
+            freedom_score: self.constraint_tracker.calculate_freedom_score(),
+            active_constraints: self.constraint_tracker.get_active_constraint_names(),
+            constraint_pressures: self.constraint_tracker.get_constraint_pressures(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            chapter: self.current_chapter,
+            scene: self.current_scene,
+        };
+
+        let key = format!("ch{}_sc{:?}", self.current_chapter, self.current_scene);
+        self.cache_mind.set_constraint_snapshot(key.clone(), snapshot);
+        key
+    }
+
+    /// Create and cache a CAPR path summary from current DNA tracker state
+    pub fn cache_capr_path_summary(&mut self) -> String {
+        let dna_health = self.dna_tracker.analyze_pattern_health();
+        let active_pathogens = self.dna_tracker.get_active_pathogens();
+
+        let summary = CAPRPathSummary {
+            loop_count: dna_health.total_units as usize,
+            last_return_vector: active_pathogens.iter()
+                .map(|p| format!("{:?}", p.transformation_type))
+                .collect(),
+            active_contradictions: active_pathogens.iter()
+                .filter(|p| matches!(p.transformation_type, TransformationType::Contradiction))
+                .map(|p| p.tag.clone())
+                .collect(),
+            pressure_points: active_pathogens.iter()
+                .filter(|p| matches!(p.transformation_type, TransformationType::Pressure))
+                .map(|p| p.tag.clone())
+                .collect(),
+            avg_loop_duration: dna_health.health_score * 100.0, // Approximate
+            last_loop_quality: dna_health.health_score,
+            chapter: self.current_chapter,
+            scene: self.current_scene,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        };
+
+        let key = format!("capr_ch{}_sc{:?}", self.current_chapter, self.current_scene);
+        self.cache_mind.set_capr_path_summary(key.clone(), summary);
+        key
+    }
+
+    /// Create and cache character emotion arc for a specific character
+    pub fn cache_character_emotion_arc(&mut self, character: &str) -> String {
+        if let Some(profile) = self.character_engine.get_character_profile(character) {
+            // Extract emotion sequences from character profile
+            let (valence_seq, intensity_seq, emotions) = profile.extract_emotion_sequences();
+
+            let arc = CharacterEmotionArc {
+                character: character.to_string(),
+                valence_sequence: valence_seq,
+                intensity_sequence: intensity_seq,
+                dominant_emotions: emotions,
+                turning_points: vec![], // Would need more sophisticated detection
+                arc_trend: "stable".to_string(), // Simplified for now
+                chapter: self.current_chapter,
+                scene_range: (self.current_scene, self.current_scene),
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            };
+
+            let key = format!("{}ch{}_sc{:?}", character, self.current_chapter, self.current_scene);
+            self.cache_mind.set_character_emotion_arc(key.clone(), arc);
+            key
+        } else {
+            String::new()
+        }
+    }
+
+    /// Get cached constraint snapshot by key
+    pub fn get_cached_constraint_snapshot(&self, key: &str) -> Option<&ConstraintSnapshot> {
+        self.cache_mind.get_constraint_snapshot(key)
+    }
+
+    /// Get cached CAPR path summary by key
+    pub fn get_cached_capr_path_summary(&self, key: &str) -> Option<&CAPRPathSummary> {
+        self.cache_mind.get_capr_path_summary(key)
+    }
+
+    /// Get cached character emotion arc by key
+    pub fn get_cached_character_emotion_arc(&self, key: &str) -> Option<&CharacterEmotionArc> {
+        self.cache_mind.get_character_emotion_arc(key)
+    }
+
+    /// Get cache statistics
+    pub fn get_cache_stats(&self) -> serde_json::Value {
+        serde_json::json!({
+            "constraint_cache": {
+                "size": self.cache_mind.constraint_cache.len(),
+                "capacity": self.cache_mind.constraint_cache.capacity(),
+                "hit_ratio": self.cache_mind.constraint_cache.hit_ratio()
+            },
+            "capr_cache": {
+                "size": self.cache_mind.capr_cache.len(),
+                "capacity": self.cache_mind.capr_cache.capacity(),
+                "hit_ratio": self.cache_mind.capr_cache.hit_ratio()
+            },
+            "character_cache": {
+                "size": self.cache_mind.character_cache.len(),
+                "capacity": self.cache_mind.character_cache.capacity(),
+                "hit_ratio": self.cache_mind.character_cache.hit_ratio()
+            }
+        })
+    }
+
+    /// Load cache state from JSON file
+    pub fn load_cache_from_file(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.cache_mind.load_from_file(path)
+    }
+
+    /// Save cache state to JSON file
+    pub fn save_cache_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.cache_mind.save_to_file(path)
+    }
+
+    /// Auto-save cache state to default location
+    pub fn auto_save_cache(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.cache_mind.auto_save()
+    }
+
+    /// Clear all cache entries
+    pub fn clear_cache(&mut self) {
+        self.cache_mind.clear_all();
+    }
+
+    // ========================================================================
+    // AdaptIQ Integration Methods
+    // ========================================================================
+
+    /// Update adaptive settings based on current context
+    fn update_adaptive_settings(&mut self) {
+        if self.adapt_iq_engine.is_none() {
+            // Initialize AdaptIQ engine on first use
+            let entropy = 0.5; // Default entropy, will be updated on analyze_prompt
+            self.adapt_iq_engine = Some(AdaptIQEngine::new(entropy, self.config.taste_profile.clone()));
+        }
+
+        if let Some(ref mut engine) = self.adapt_iq_engine {
+            // Get recent pulse data for decision making
+            if let Some(recent_pulse) = self.pulse_trace.latest() {
+                self.current_adapt_settings = engine.decide(recent_pulse, &self.cache_mind);
+            } else {
+                // No pulse data available, use quick decision
+                self.current_adapt_settings = engine.quick_decide(0.5, 50.0);
+            }
+        }
+    }
+
+    /// Analyze prompt and update AdaptIQ with calculated entropy
+    pub fn analyze_prompt(&mut self, prompt: &str) -> f32 {
+        let entropy = entropy_score(prompt);
+        let cognitive_load = estimate_cognitive_load(prompt);
+
+        // Initialize or update AdaptIQ engine with new entropy
+        if let Some(ref mut engine) = self.adapt_iq_engine {
+            engine.update_entropy(entropy);
+        } else if self.config.enable_adapt_iq {
+            self.adapt_iq_engine = Some(AdaptIQEngine::new(entropy, self.config.taste_profile.clone()));
+        }
+
+        // Update settings based on new prompt
+        if self.config.enabled_systems.adaptive_intelligence && self.config.enable_adapt_iq {
+            self.update_adaptive_settings();
+        }
+
+        cognitive_load.overall_load
+    }
+
+    /// Get current AdaptIQ settings
+    pub fn get_adapt_settings(&self) -> &AdaptIQSettings {
+        &self.current_adapt_settings
+    }
+
+    /// Update taste preferences
+    pub fn update_taste_profile(&mut self, taste: TasteLUT) {
+        self.config.taste_profile = taste.clone();
+        if let Some(ref mut engine) = self.adapt_iq_engine {
+            engine.update_taste(taste);
+        }
+    }
+
+    /// Set taste profile to predefined preset
+    pub fn set_taste_preset(&mut self, preset: &str) {
+        let taste = match preset.to_lowercase().as_str() {
+            "curious" => TasteLUT::curious(),
+            "safe" => TasteLUT::safe(),
+            "experimental" => TasteLUT::experimental(),
+            "balanced" | _ => TasteLUT::balanced(),
+        };
+        self.update_taste_profile(taste);
+    }
+
+    /// Get AdaptIQ engine statistics
+    pub fn get_adapt_iq_stats(&self) -> Option<serde_json::Value> {
+        if let Some(ref engine) = self.adapt_iq_engine {
+            let stats = engine.get_stats();
+            Some(serde_json::json!({
+                "decision_count": stats.decision_count,
+                "avg_decision_time_ms": stats.avg_decision_time_ms,
+                "cache_utilization": stats.cache_utilization,
+                "performance_adjustments": stats.performance_adjustments,
+                "last_decision": stats.last_decision_timestamp.map(|t| t.elapsed().as_secs()),
+                "current_settings": {
+                    "recursion_depth": self.current_adapt_settings.recursion_depth,
+                    "pathogen_sensitivity": self.current_adapt_settings.pathogen_sensitivity,
+                    "affect_assertiveness": self.current_adapt_settings.affect_assertiveness,
+                    "beat_sampling_rate": self.current_adapt_settings.beat_sampling_rate,
+                    "zc_hysteresis_margin": self.current_adapt_settings.zc_hysteresis_margin,
+                    "eat_resolution_scale": self.current_adapt_settings.eat_resolution_scale,
+                    "cache_preference": self.current_adapt_settings.cache_preference
+                },
+                "taste_profile": {
+                    "curiosity": self.config.taste_profile.curiosity,
+                    "coherence_pleasure": self.config.taste_profile.coherence_pleasure,
+                    "unease": self.config.taste_profile.unease,
+                    "awe": self.config.taste_profile.awe,
+                    "boredom": self.config.taste_profile.boredom
+                }
+            }))
+        } else {
+            None
+        }
+    }
+
+    /// Apply AdaptIQ settings to current analysis parameters
+    pub fn apply_adaptive_settings(&mut self) {
+        if !self.config.enable_adapt_iq || !self.config.enabled_systems.adaptive_intelligence {
+            return;
+        }
+
+        let settings = &self.current_adapt_settings;
+
+        // Apply settings to various subsystems
+        // Note: This is a simplified implementation - in practice, you'd apply these
+        // settings to the actual analysis parameters of each subsystem
+
+        // Adjust assertiveness level based on affect assertiveness
+        self.config.assertiveness_level = (self.config.assertiveness_level * settings.affect_assertiveness).clamp(0.0, 1.0);
+
+        // Adjust sensitivity settings based on pathogen sensitivity
+        self.config.sensitivity.constraint_pressure *= settings.pathogen_sensitivity;
+        self.config.sensitivity.character_inconsistency *= settings.pathogen_sensitivity;
+
+        // The recursion_depth, beat_sampling_rate, etc. would be used by the
+        // actual analysis algorithms when they're implemented
+    }
+
+    /// Force AdaptIQ recalibration based on current context
+    pub fn recalibrate_adapt_iq(&mut self) {
+        if self.config.enable_adapt_iq && self.config.enabled_systems.adaptive_intelligence {
+            if let Some(ref mut engine) = self.adapt_iq_engine {
+                engine.reset_stats();
+                self.update_adaptive_settings();
+            }
+        }
+    }
+
+    /// Get adaptive intelligence status
+    pub fn get_adaptive_status(&self) -> serde_json::Value {
+        serde_json::json!({
+            "enabled": self.config.enable_adapt_iq && self.config.enabled_systems.adaptive_intelligence,
+            "engine_initialized": self.adapt_iq_engine.is_some(),
+            "current_settings": {
+                "recursion_depth": self.current_adapt_settings.recursion_depth,
+                "pathogen_sensitivity": self.current_adapt_settings.pathogen_sensitivity,
+                "affect_assertiveness": self.current_adapt_settings.affect_assertiveness,
+                "beat_sampling_rate": self.current_adapt_settings.beat_sampling_rate,
+                "zc_hysteresis_margin": self.current_adapt_settings.zc_hysteresis_margin
+            },
+            "taste_profile": {
+                "curiosity": self.config.taste_profile.curiosity,
+                "coherence_pleasure": self.config.taste_profile.coherence_pleasure,
+                "unease": self.config.taste_profile.unease,
+                "awe": self.config.taste_profile.awe,
+                "boredom": self.config.taste_profile.boredom
+            }
+        })
+    }
+
+    // ========================================================================
+    // Qualitier Integration Methods
+    // ========================================================================
+
+    /// Get current quality level
+    pub fn get_quality_level(&self) -> QualityLevel {
+        self.qualitier.current_level()
+    }
+
+    /// Set quality level manually (bypasses adaptive logic)
+    pub fn set_quality_level(&mut self, level: QualityLevel) {
+        self.qualitier.set_quality_level(level);
+        log::info!("Quality level manually set to {:?}", level);
+    }
+
+    /// Check if a feature is enabled at current quality level
+    pub fn is_feature_enabled(&self, feature: QualityFeature) -> bool {
+        self.qualitier.is_feature_enabled(feature)
+    }
+
+    /// Get comprehensive Qualitier status report
+    pub fn get_qualitier_status(&self) -> QualitierStatusReport {
+        self.qualitier.get_status_report()
+    }
+
+    /// Update Qualitier performance configuration
+    pub fn update_performance_config(&mut self, config: PerformanceConfig) {
+        self.config.performance_config = config.clone();
+        self.qualitier = Qualitier::with_config(config);
+        log::info!("Performance configuration updated");
+    }
+
+    /// Reset Qualitier statistics
+    pub fn reset_qualitier_stats(&mut self) {
+        self.qualitier.reset_stats();
+    }
+
+    /// Get Qualitier statistics as JSON
+    pub fn get_qualitier_stats(&self) -> serde_json::Value {
+        let stats = self.qualitier.get_stats();
+        let distribution = self.qualitier.get_quality_distribution();
+        let status = self.get_qualitier_status();
+
+        serde_json::json!({
+            "current_quality_level": status.current_level,
+            "memory_pressure": status.memory_pressure,
+            "adaptive_enabled": status.adaptive_enabled,
+            "statistics": {
+                "quality_changes": stats.quality_changes,
+                "memory_degradations": stats.memory_degradations,
+                "narrative_stress_upgrades": stats.narrative_stress_upgrades,
+                "decision_count": stats.decision_count,
+                "avg_decision_time_ms": stats.avg_decision_time_ms
+            },
+            "time_distribution": {
+                "minimal_percent": distribution.minimal_percent,
+                "standard_percent": distribution.standard_percent,
+                "enhanced_percent": distribution.enhanced_percent,
+                "premium_percent": distribution.premium_percent
+            },
+            "quality_level_info": {
+                "minimal": {
+                    "description": QualityLevel::Minimal.description(),
+                    "max_recursion_depth": QualityLevel::Minimal.max_recursion_depth(),
+                    "pathogen_sensitivity_cap": QualityLevel::Minimal.pathogen_sensitivity_cap()
+                },
+                "standard": {
+                    "description": QualityLevel::Standard.description(),
+                    "max_recursion_depth": QualityLevel::Standard.max_recursion_depth(),
+                    "pathogen_sensitivity_cap": QualityLevel::Standard.pathogen_sensitivity_cap()
+                },
+                "enhanced": {
+                    "description": QualityLevel::Enhanced.description(),
+                    "max_recursion_depth": QualityLevel::Enhanced.max_recursion_depth(),
+                    "pathogen_sensitivity_cap": QualityLevel::Enhanced.pathogen_sensitivity_cap()
+                },
+                "premium": {
+                    "description": QualityLevel::Premium.description(),
+                    "max_recursion_depth": QualityLevel::Premium.max_recursion_depth(),
+                    "pathogen_sensitivity_cap": QualityLevel::Premium.pathogen_sensitivity_cap()
+                }
+            },
+            "feature_enablement": {
+                "obligation_injection": self.is_feature_enabled(QualityFeature::ObligationInjection),
+                "emotion_tracking": self.is_feature_enabled(QualityFeature::EmotionTracking),
+                "spatial_validation": self.is_feature_enabled(QualityFeature::SpatialValidation),
+                "capr_depth_analysis": self.is_feature_enabled(QualityFeature::CAPRDepthAnalysis),
+                "character_consistency": self.is_feature_enabled(QualityFeature::CharacterConsistency),
+                "engagement_loops": self.is_feature_enabled(QualityFeature::EngagementLoops),
+                "drift_stabilization": self.is_feature_enabled(QualityFeature::DriftStabilization),
+                "cache_optimization": self.is_feature_enabled(QualityFeature::CacheOptimization),
+                "full_recursion": self.is_feature_enabled(QualityFeature::FullRecursion)
+            },
+            "last_change_elapsed_ms": status.last_change_elapsed_ms
+        })
+    }
+
+    /// Force Qualitier quality assessment based on current state
+    pub fn reassess_quality(&mut self) {
+        if let Some(recent_pulse) = self.pulse_trace.latest() {
+            let quality_changed = self.qualitier.decide(recent_pulse, &self.current_adapt_settings);
+            if quality_changed {
+                log::info!("Quality reassessment changed tier to {:?}", self.qualitier.current_level());
+                // Apply quality constraints to adaptive settings
+                self.qualitier.clamp_settings(&mut self.current_adapt_settings);
+            }
+        }
+    }
+
+    /// Get quality-adjusted analysis insights based on current tier
+    pub fn get_quality_filtered_insights(&mut self, insights: Vec<NarrativeInsight>) -> Vec<NarrativeInsight> {
+        match self.qualitier.current_level() {
+            QualityLevel::Minimal => {
+                // Only critical insights in minimal mode
+                insights.into_iter()
+                    .filter(|insight| matches!(insight.priority, InsightPriority::Critical))
+                    .take(3) // Limit to 3 critical insights
+                    .collect()
+            }
+            QualityLevel::Standard => {
+                // Critical and important insights
+                insights.into_iter()
+                    .filter(|insight| matches!(insight.priority, InsightPriority::Critical | InsightPriority::Important))
+                    .take(5) // Limit to 5 insights
+                    .collect()
+            }
+            QualityLevel::Enhanced => {
+                // All except minor insights
+                insights.into_iter()
+                    .filter(|insight| !matches!(insight.priority, InsightPriority::Minor))
+                    .take(8) // Limit to 8 insights
+                    .collect()
+            }
+            QualityLevel::Premium => {
+                // All insights, no filtering
+                insights
+            }
+        }
+    }
+
+    // ========== ObliSelect Smart Obligation Management Methods ==========
+
+    /// Updates ObliSelect context with current narrative state
+    pub fn update_obligation_context(&mut self) {
+        let recent_characters = self.character_engine.get_all_profiles()
+            .keys()
+            .take(5)
+            .cloned()
+            .collect();
+
+        let tension_level = self.current_emotional_state
+            .as_ref()
+            .map(|state| state.intensity - 0.5) // Convert 0-1 to -0.5 to 0.5
+            .unwrap_or(0.0);
+
+        let narrative_context = format!(
+            "Chapter {}, Scene {:?}, Characters: {:?}",
+            self.current_chapter,
+            self.current_scene,
+            recent_characters
+        );
+
+        self.obli_select.update_context(
+            self.current_chapter,
+            recent_characters,
+            tension_level,
+            narrative_context,
+        );
+    }
+
+    /// Gets smart obligation management status
+    pub fn get_obligation_status(&mut self) -> serde_json::Value {
+        let metrics = self.obli_select.get_metrics();
+        let settings = self.obli_select.get_settings();
+
+        serde_json::json!({
+            "total_obligations": metrics.total_obligations,
+            "obligations_by_category": metrics.obligations_by_category,
+            "obligations_by_urgency": metrics.obligations_by_urgency,
+            "stale_obligations": metrics.stale_obligations,
+            "overused_obligations": metrics.overused_obligations,
+            "average_injection_count": metrics.average_injection_count,
+            "fulfillment_progress_average": metrics.fulfillment_progress_average,
+            "tension_distribution": {
+                "negative": metrics.tension_distribution.0,
+                "neutral": metrics.tension_distribution.1,
+                "positive": metrics.tension_distribution.2
+            },
+            "dependency_chain_length_max": metrics.dependency_chain_length_max,
+            "last_selection_performance_ms": metrics.last_selection_performance_ms,
+            "settings": {
+                "max_obligations_per_selection": settings.max_obligations_per_selection,
+                "urgency_weight": settings.urgency_weight,
+                "salience_weight": settings.salience_weight,
+                "freshness_weight": settings.freshness_weight,
+                "tension_balance_weight": settings.tension_balance_weight,
+                "dependency_weight": settings.dependency_weight,
+                "context_relevance_weight": settings.context_relevance_weight,
+                "adaptive_weighting_enabled": settings.enable_adaptive_weighting,
+                "dependency_resolution_enabled": settings.enable_dependency_resolution,
+                "contextual_filtering_enabled": settings.enable_contextual_filtering
+            }
+        })
+    }
+
+    /// Gets selected obligations with scoring details
+    pub fn get_selected_obligations_with_scores(&mut self, max_count: Option<usize>) -> serde_json::Value {
+        self.update_obligation_context();
+        let obligation_scores = self.obli_select.select_obligations(max_count);
+
+        serde_json::json!({
+            "selected_obligations": obligation_scores.iter().map(|score| {
+                serde_json::json!({
+                    "obligation_id": score.obligation_id,
+                    "total_score": score.total_score,
+                    "urgency_score": score.urgency_score,
+                    "salience_score": score.salience_score,
+                    "freshness_score": score.freshness_score,
+                    "tension_balance_score": score.tension_balance_score,
+                    "dependency_score": score.dependency_score,
+                    "context_relevance_score": score.context_relevance_score,
+                    "justification": score.justification
+                })
+            }).collect::<Vec<_>>(),
+            "selection_count": obligation_scores.len(),
+            "selection_performance_ms": self.obli_select.get_metrics().last_selection_performance_ms
+        })
+    }
+
+    /// Adds a new obligation to the management system
+    pub fn add_obligation(&mut self, obligation: crate::obligations::Obligation) {
+        self.obli_select.add_obligation(obligation);
+    }
+
+    /// Removes an obligation (when fully fulfilled)
+    pub fn remove_obligation(&mut self, obligation_id: &str) -> bool {
+        self.obli_select.remove_obligation(obligation_id).is_some()
+    }
+
+    /// Updates an obligation's fulfillment progress
+    pub fn update_obligation_fulfillment(&mut self, obligation_id: &str, progress: f32) -> bool {
+        self.obli_select.update_fulfillment_progress(obligation_id, progress)
+    }
+
+    /// Gets obligations that haven't been used recently (staleness monitoring)
+    pub fn get_stale_obligations(&self) -> serde_json::Value {
+        let stale_obligations = self.obli_select.get_stale_obligations(
+            self.obli_select.get_settings().staleness_penalty_threshold
+        );
+
+        serde_json::json!({
+            "stale_obligations": stale_obligations.iter().map(|obligation| {
+                serde_json::json!({
+                    "id": obligation.id,
+                    "content": obligation.content,
+                    "category": obligation.category,
+                    "urgency": obligation.urgency,
+                    "chapters_since_introduction": self.current_chapter.saturating_sub(obligation.chapter_introduced),
+                    "injection_count": obligation.injection_count,
+                    "last_injection": obligation.last_injection,
+                    "fulfillment_progress": obligation.fulfillment_progress
+                })
+            }).collect::<Vec<_>>(),
+            "stale_count": stale_obligations.len(),
+            "staleness_threshold": self.obli_select.get_settings().staleness_penalty_threshold
+        })
+    }
+
+    /// Gets obligations that have been overused
+    pub fn get_overused_obligations(&self) -> serde_json::Value {
+        let overused_obligations = self.obli_select.get_overused_obligations(
+            self.obli_select.get_settings().overuse_penalty_threshold
+        );
+
+        serde_json::json!({
+            "overused_obligations": overused_obligations.iter().map(|obligation| {
+                serde_json::json!({
+                    "id": obligation.id,
+                    "content": obligation.content,
+                    "injection_count": obligation.injection_count,
+                    "last_injection": obligation.last_injection,
+                    "overuse_threshold": self.obli_select.get_settings().overuse_penalty_threshold
+                })
+            }).collect::<Vec<_>>(),
+            "overused_count": overused_obligations.len()
+        })
+    }
+
+    /// Updates ObliSelect settings
+    pub fn update_obligation_settings(&mut self, settings: ObliSelectSettings) {
+        self.obli_select.update_settings(settings);
+    }
+
+    /// Resets injection statistics for testing or system reset
+    pub fn reset_obligation_stats(&mut self) {
+        self.obli_select.reset_injection_stats();
+    }
+
+    /// Gets all obligations for inspection (debugging purposes)
+    pub fn get_all_obligations(&self) -> serde_json::Value {
+        let all_obligations = self.obli_select.get_all_obligations();
+
+        serde_json::json!({
+            "obligations": all_obligations.iter().map(|(id, obligation)| {
+                serde_json::json!({
+                    "id": id,
+                    "content": obligation.content,
+                    "category": obligation.category,
+                    "urgency": obligation.urgency,
+                    "created_at": obligation.created_at,
+                    "last_injection": obligation.last_injection,
+                    "injection_count": obligation.injection_count,
+                    "chapter_introduced": obligation.chapter_introduced,
+                    "characters_involved": obligation.characters_involved,
+                    "tension_vector": obligation.tension_vector,
+                    "salience_boost": obligation.salience_boost,
+                    "fulfillment_progress": obligation.fulfillment_progress,
+                    "dependencies": obligation.dependencies
+                })
+            }).collect::<Vec<_>>(),
+            "total_count": all_obligations.len()
+        })
+    }
+
+    /// Gets detailed metrics for obligation management performance
+    pub fn get_obligation_metrics(&self) -> &ObligationMetrics {
+        self.obli_select.get_metrics()
+    }
 }
 
 /// Events that can be recorded in the narrative system
@@ -1388,6 +2230,9 @@ impl Default for AssistantConfig {
             sensitivity: SensitivitySettings::default(),
             drift_config: DriftStabilizerConfig::default(),
             ric_mode: RICMode::default(),
+            taste_profile: TasteLUT::default(),
+            enable_adapt_iq: true,
+            performance_config: PerformanceConfig::default(),
         }
     }
 }
@@ -1401,6 +2246,7 @@ impl Default for EnabledSystems {
             character_consistency: true,
             engagement_loops: true,
             drift_stabilization: true,
+            adaptive_intelligence: true,
         }
     }
 }

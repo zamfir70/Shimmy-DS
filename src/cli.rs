@@ -18,6 +18,14 @@ pub struct Cli {
         help = "Additional model directories to search (e.g., --model-dirs 'D:\\models;E:\\ollama\\models')"
     )]
     pub model_dirs: Option<String>,
+
+    /// Set taste profile for adaptive intelligence (curious, safe, balanced, experimental)
+    #[arg(
+        long,
+        global = true,
+        help = "Taste profile for AdaptIQ: curious (exploration-focused), safe (stability-focused), balanced (default), experimental (artistic)"
+    )]
+    pub taste: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]

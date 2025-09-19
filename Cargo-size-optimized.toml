@@ -1,0 +1,17 @@
+# Add these additional size optimizations to Cargo.toml
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"        # Optimize for size (already present)
+strip = true           # Strip debug symbols (ADD THIS)
+panic = "abort"        # Smaller panic handling (ADD THIS)
+
+# Consider removing unused features to reduce size
+[features]
+default = ["huggingface"]  # Remove llama if not needed for size
+minimal = []               # Ultra-minimal build
+size-optimized = ["huggingface"]
+
+# Optional: Add UPX compression step
+# In a build script or CI, run: upx --best target/release/shimmy.exe

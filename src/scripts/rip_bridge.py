@@ -10,6 +10,8 @@ and the Python RIP (Recursive Integrity Protocol) components.
 import sys
 import json
 import asyncio
+import os
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 # Import RIP components
@@ -137,6 +139,146 @@ class RIPBridge:
         else:
             return f"Extensive recursive expansion ({expansion_count} iterations) - deep narrative exploration achieved"
 
+    def cache_constraint_snapshot(self, chapter: int, scene: Optional[int],
+                                freedom_score: float, constraints: List[str],
+                                pressures: Dict[str, float]) -> str:
+        """Cache a constraint snapshot for cross-language access"""
+        snapshot = {
+            'freedom_score': freedom_score,
+            'active_constraints': constraints,
+            'constraint_pressures': pressures,
+            'timestamp': int(__import__('time').time()),
+            'chapter': chapter,
+            'scene': scene
+        }
+
+        cache_dir = Path.home() / '.shimmy'
+        cache_dir.mkdir(exist_ok=True)
+
+        key = f"ch{chapter}_sc{scene}"
+        cache_file = cache_dir / f"constraint_{key}.json"
+
+        with open(cache_file, 'w') as f:
+            json.dump(snapshot, f, indent=2)
+
+        return str(cache_file)
+
+    def cache_capr_summary(self, chapter: int, scene: Optional[int],
+                          loop_count: int, return_vector: List[str],
+                          contradictions: List[str], pressure_points: List[str],
+                          loop_quality: float) -> str:
+        """Cache a CAPR path summary for cross-language access"""
+        summary = {
+            'loop_count': loop_count,
+            'last_return_vector': return_vector,
+            'active_contradictions': contradictions,
+            'pressure_points': pressure_points,
+            'avg_loop_duration': 0.0,  # Would need timing data
+            'last_loop_quality': loop_quality,
+            'chapter': chapter,
+            'scene': scene,
+            'timestamp': int(__import__('time').time())
+        }
+
+        cache_dir = Path.home() / '.shimmy'
+        cache_dir.mkdir(exist_ok=True)
+
+        key = f"capr_ch{chapter}_sc{scene}"
+        cache_file = cache_dir / f"capr_{key}.json"
+
+        with open(cache_file, 'w') as f:
+            json.dump(summary, f, indent=2)
+
+        return str(cache_file)
+
+    def cache_character_emotions(self, character: str, chapter: int, scene: Optional[int],
+                               valence_seq: List[float], intensity_seq: List[float],
+                               emotions: List[str], turning_points: List[int]) -> str:
+        """Cache character emotion arc for cross-language access"""
+        arc = {
+            'character': character,
+            'valence_sequence': valence_seq,
+            'intensity_sequence': intensity_seq,
+            'dominant_emotions': emotions,
+            'turning_points': turning_points,
+            'arc_trend': 'stable',  # Simplified
+            'chapter': chapter,
+            'scene_range': [scene, scene],
+            'timestamp': int(__import__('time').time())
+        }
+
+        cache_dir = Path.home() / '.shimmy'
+        cache_dir.mkdir(exist_ok=True)
+
+        key = f"{character}ch{chapter}_sc{scene}"
+        cache_file = cache_dir / f"emotion_{key}.json"
+
+        with open(cache_file, 'w') as f:
+            json.dump(arc, f, indent=2)
+
+        return str(cache_file)
+
+    def load_cached_data(self, cache_type: str, key: str) -> Optional[Dict[str, Any]]:
+        """Load cached data by type and key"""
+        cache_dir = Path.home() / '.shimmy'
+        cache_file = cache_dir / f"{cache_type}_{key}.json"
+
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return None
+        return None
+
+    async def cache_operation(self, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle cache operations from Rust side"""
+        op_type = operation.get('type')
+
+        if op_type == 'cache_constraint':
+            file_path = self.cache_constraint_snapshot(
+                operation['chapter'],
+                operation.get('scene'),
+                operation['freedom_score'],
+                operation['constraints'],
+                operation['pressures']
+            )
+            return {'success': True, 'file_path': file_path}
+
+        elif op_type == 'cache_capr':
+            file_path = self.cache_capr_summary(
+                operation['chapter'],
+                operation.get('scene'),
+                operation['loop_count'],
+                operation['return_vector'],
+                operation['contradictions'],
+                operation['pressure_points'],
+                operation['loop_quality']
+            )
+            return {'success': True, 'file_path': file_path}
+
+        elif op_type == 'cache_emotion':
+            file_path = self.cache_character_emotions(
+                operation['character'],
+                operation['chapter'],
+                operation.get('scene'),
+                operation['valence_sequence'],
+                operation['intensity_sequence'],
+                operation['emotions'],
+                operation['turning_points']
+            )
+            return {'success': True, 'file_path': file_path}
+
+        elif op_type == 'load_cache':
+            data = self.load_cached_data(
+                operation['cache_type'],
+                operation['key']
+            )
+            return {'success': data is not None, 'data': data}
+
+        else:
+            return {'success': False, 'error': f'Unknown cache operation: {op_type}'}
+
 
 async def main():
     """Main entry point for RIP bridge"""
@@ -148,15 +290,21 @@ async def main():
 
         query = json.loads(query_json)
 
-        # Validate required fields
-        required_fields = ['text', 'context', 'seed', 'beat', 'max_iterations', 'budget_remaining']
-        for field in required_fields:
-            if field not in query:
-                raise ValueError(f"Missing required field: {field}")
-
-        # Initialize bridge and perform analysis
+        # Initialize bridge
         bridge = RIPBridge()
-        result = await bridge.analyze_narrative_content(query)
+
+        # Check if this is a cache operation
+        if 'operation_type' in query and query['operation_type'] == 'cache':
+            result = await bridge.cache_operation(query)
+        else:
+            # Validate required fields for narrative analysis
+            required_fields = ['text', 'context', 'seed', 'beat', 'max_iterations', 'budget_remaining']
+            for field in required_fields:
+                if field not in query:
+                    raise ValueError(f"Missing required field: {field}")
+
+            # Perform narrative analysis
+            result = await bridge.analyze_narrative_content(query)
 
         # Output result as JSON
         print(json.dumps(result, indent=2))

@@ -5,6 +5,7 @@
 ///
 /// This module provides the core functionality for injecting narrative obligations
 /// into user prompts to ensure story continuity and narrative coherence.
+/// Now enhanced with ObliSelect smart obligation management for intelligent selection.
 
 /// Injects obligations into a prompt by prepending each obligation as a statement.
 ///
@@ -39,7 +40,51 @@ pub fn inject_obligations(prompt: &str, obligations: &[String]) -> String {
     injected
 }
 
-/// Stub function to load obligations from persistent state.
+use crate::obligations::{SmartObligationManager, ObligationScore};
+
+/// Loads obligations using the ObliSelect smart obligation management system.
+///
+/// This function interfaces with the SmartObligationManager to intelligently
+/// select the most relevant obligations based on current narrative context,
+/// urgency, freshness, and other scoring factors.
+///
+/// # Arguments
+/// * `obligation_manager` - Reference to the SmartObligationManager
+/// * `max_obligations` - Optional maximum number of obligations to select
+///
+/// # Returns
+/// A vector of selected obligation content strings
+pub fn load_smart_obligations(
+    obligation_manager: &mut SmartObligationManager,
+    max_obligations: Option<usize>
+) -> Vec<String> {
+    let selected_scores = obligation_manager.select_obligations(max_obligations);
+
+    selected_scores.into_iter()
+        .filter_map(|score| {
+            obligation_manager.get_all_obligations()
+                .get(&score.obligation_id)
+                .map(|obligation| obligation.content.clone())
+        })
+        .collect()
+}
+
+/// Loads obligations with detailed scoring information for analysis and debugging.
+///
+/// # Arguments
+/// * `obligation_manager` - Reference to the SmartObligationManager
+/// * `max_obligations` - Optional maximum number of obligations to select
+///
+/// # Returns
+/// A vector of ObligationScore structs with detailed scoring information
+pub fn load_smart_obligations_with_scores(
+    obligation_manager: &mut SmartObligationManager,
+    max_obligations: Option<usize>
+) -> Vec<ObligationScore> {
+    obligation_manager.select_obligations(max_obligations)
+}
+
+/// Legacy stub function to load obligations from persistent state.
 ///
 /// In a full implementation, this would read from a file, database, or other
 /// persistent storage mechanism to retrieve the current list of unresolved
@@ -49,6 +94,56 @@ pub fn inject_obligations(prompt: &str, obligations: &[String]) -> String {
 /// A vector of obligation strings
 pub fn load_obligations() -> Vec<String> {
     vec!["Harper was last seen in the attic".to_string()]
+}
+
+/// Enhanced obligation injection that uses ObliSelect for intelligent selection.
+///
+/// This function combines the traditional obligation injection with smart
+/// obligation management, selecting the most contextually relevant obligations
+/// based on narrative state and scoring algorithms.
+///
+/// # Arguments
+/// * `prompt` - The original user prompt
+/// * `obligation_manager` - Mutable reference to the SmartObligationManager
+/// * `max_obligations` - Optional maximum number of obligations to inject
+///
+/// # Returns
+/// A new string with intelligently selected obligations prepended to the original prompt
+pub fn inject_smart_obligations(
+    prompt: &str,
+    obligation_manager: &mut SmartObligationManager,
+    max_obligations: Option<usize>
+) -> String {
+    let selected_obligations = load_smart_obligations(obligation_manager, max_obligations);
+    inject_obligations(prompt, &selected_obligations)
+}
+
+/// Enhanced obligation injection with scoring details for debugging and analysis.
+///
+/// # Arguments
+/// * `prompt` - The original user prompt
+/// * `obligation_manager` - Mutable reference to the SmartObligationManager
+/// * `max_obligations` - Optional maximum number of obligations to inject
+///
+/// # Returns
+/// A tuple containing the injected prompt string and the detailed scoring information
+pub fn inject_smart_obligations_with_details(
+    prompt: &str,
+    obligation_manager: &mut SmartObligationManager,
+    max_obligations: Option<usize>
+) -> (String, Vec<ObligationScore>) {
+    let obligation_scores = load_smart_obligations_with_scores(obligation_manager, max_obligations);
+
+    let selected_obligations: Vec<String> = obligation_scores.iter()
+        .filter_map(|score| {
+            obligation_manager.get_all_obligations()
+                .get(&score.obligation_id)
+                .map(|obligation| obligation.content.clone())
+        })
+        .collect();
+
+    let injected_prompt = inject_obligations(prompt, &selected_obligations);
+    (injected_prompt, obligation_scores)
 }
 
 #[cfg(test)]

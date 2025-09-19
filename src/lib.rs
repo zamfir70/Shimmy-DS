@@ -44,6 +44,18 @@ pub mod recursive_narrative_assistant;
 // SHIMMY-DS Recursive Integrity Core (RIC v1.0)
 pub mod recursive_integrity_core;
 
+// SHIMMY-DS Telemetry System
+pub mod telemetry;
+
+// SHIMMY-DS Adaptive Intelligence System
+pub mod adaptive;
+
+// SHIMMY-DS Profile Persistence System
+pub mod profile;
+
+// SHIMMY-DS Obligation Management System
+pub mod obligations;
+
 #[cfg(test)]
 pub mod tests;
 

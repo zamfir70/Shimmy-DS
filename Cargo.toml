@@ -97,3 +97,7 @@ harness = false
 [[bench]]
 name = "generation_performance"
 harness = false
+
+[[bench]]
+name = "narrative_intelligence_performance"
+harness = false

@@ -77,6 +77,26 @@ cache_max_age_minutes = 30
 # Enable performance metrics collection
 collect_metrics = false
 
+# Qualitier adaptive quality control configuration
+[performance.qualitier]
+# Enable/disable adaptive quality adjustment
+adaptive_quality = true
+
+# Maximum memory usage in MB before downgrading quality
+max_memory_mb = 100
+
+# Maximum analysis time in milliseconds per operation
+max_analysis_time_ms = 50
+
+# Memory pressure threshold for warnings (0.0-1.0)
+memory_pressure_threshold = 0.8
+
+# CPU usage threshold for degradation (0.0-1.0)
+cpu_threshold = 0.85
+
+# Minimum time between quality level changes (ms)
+quality_change_cooldown_ms = 5000
+
 [drift_stabilizer]
 # Enable/disable recursive drift stabilizer
 enabled = true
@@ -319,6 +339,56 @@ recovery_strategies = [
 # Recovery attempt limits
 max_recovery_attempts = 3
 recovery_cooldown_sec = 60
+
+# ObliSelect Smart Obligation Management Configuration
+[obli_select]
+# Enable/disable smart obligation management
+enabled = true
+
+# Maximum obligations to select per prompt injection
+max_obligations_per_selection = 8
+
+# Scoring weight configuration (must sum to 1.0)
+urgency_weight = 0.25
+salience_weight = 0.20
+freshness_weight = 0.15
+tension_balance_weight = 0.20
+dependency_weight = 0.10
+context_relevance_weight = 0.10
+
+# Penalty thresholds
+staleness_penalty_threshold = 5  # chapters before obligation becomes stale
+overuse_penalty_threshold = 10   # injection count before overuse penalty
+
+# Target tension balance (-1.0 to 1.0)
+tension_balance_target = 0.0
+
+# Feature toggles
+enable_adaptive_weighting = true      # Adjust weights based on narrative context
+enable_dependency_resolution = true   # Resolve obligation dependencies
+enable_contextual_filtering = true    # Filter obligations by context relevance
+
+# Performance monitoring
+enable_performance_logging = true
+max_selection_time_ms = 50           # Warning threshold for selection performance
+
+# Obligation lifecycle management
+auto_remove_fulfilled = false        # Automatically remove 100% fulfilled obligations
+fulfillment_threshold = 1.0          # Threshold for considering obligation fulfilled
+
+# Category-specific settings
+[obli_select.category_weights]
+# Boost certain categories in different narrative phases
+character_development = 1.0
+plot_advancement = 1.2
+world_building = 0.8
+emotional_resolution = 1.1
+foreshadowing = 0.9
+thematic_exploration = 1.0
+dialogue_promise = 1.1
+setting_detail = 0.7
+conflict_resolution = 1.3
+relationship_dynamics = 1.0
 
 # Emergency continuity floor configuration
 [rip_ric_unified_protocol.continuity_floor]
