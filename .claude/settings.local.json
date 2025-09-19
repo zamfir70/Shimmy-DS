@@ -1,4 +1,12 @@
 {
+  "env": {
+    "CLAUDE_ENHANCED_MEMORY": "true",
+    "CLAUDE_CONTEXT_RETENTION": "2MB+",
+    "CLAUDE_BATCH_OPERATIONS": "true",
+    "CLAUDE_PARALLEL_EXECUTION": "true",
+    "CLAUDE_PROACTIVE_PLANNING": "true",
+    "CLAUDE_TODOWRITE_INTEGRATION": "true"
+  },
   "permissions": {
     "allow": [
       "*",
@@ -15,10 +23,25 @@
       "Bash(cargo check:*)",
       "Bash(git remote add:*)",
       "Bash(git init:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(python .claude/clrecall.py:*)",
+      "Bash(python .claude/claudecache.py:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": [],
     "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '🧠 Enhanced Memory System Ready - Run: python .claude/clrecall.py'"
+          }
+        ]
+      }
+    ]
   }
 }

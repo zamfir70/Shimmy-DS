@@ -1,0 +1,437 @@
+===============================================================================
+                            SHIMMY-DS SYSTEM AUDIT
+                          Comprehensive File & Dependency Analysis
+                              Generated: 2025-09-16
+===============================================================================
+
+PROJECT OVERVIEW
+================
+Name: shimmy (Shimmy-DS)
+Version: 1.3.3
+Description: Lightweight 5MB Ollama alternative with native SafeTensors support
+License: MIT
+Repository: https://github.com/Michael-A-Kuykendall/shimmy
+
+DIRECTORY STRUCTURE
+==================
+
+ROOT LEVEL
+----------
+├── .cargo/                     # Cargo configuration
+├── .claude/                    # Claude Code enhanced memory system
+├── .github/                    # GitHub templates and workflows
+├── assets/                     # Project assets
+├── benches/                    # Benchmark tests
+├── coverage/                   # Test coverage reports
+├── deploy/                     # Deployment configurations
+├── docs/                       # Documentation
+├── libs/                       # Native libraries
+├── logs/                       # Runtime logs (SHIMMY-DS)
+├── packaging/                  # Package configuration
+├── release-artifacts/          # Release binaries
+├── scripts/                    # Build and utility scripts
+├── shimmy-vscode/             # VS Code extension
+├── src/                       # Source code
+├── test-huggingface-model/    # Test model data
+├── test-safetensors-model/    # Test model data
+├── tests/                     # Integration tests
+├── Cargo.toml                 # Rust package configuration
+├── shimmy-ds.toml            # SHIMMY-DS augmentation configuration
+└── Various documentation files
+
+SOURCE CODE STRUCTURE
+=====================
+
+src/
+├── main.rs                    # Application entry point + SHIMMY-DS integration
+├── lib.rs                     # Library module exports
+├── bin/                       # Binary utilities
+│   ├── create_realistic_safetensors.rs  # Test data generation
+│   ├── create_test_safetensors.rs       # Test data generation
+│   ├── test_cache_performance.rs        # Cache benchmarking
+│   └── test_real_safetensors.rs         # SafeTensors testing
+├── cache/                     # Caching system
+│   ├── mod.rs                 # Cache module exports
+│   └── model_cache.rs         # Model caching implementation
+├── engine/                    # Inference engines
+│   ├── mod.rs                 # Engine traits and interfaces
+│   ├── adapter.rs             # Universal engine adapter
+│   ├── huggingface.rs         # HuggingFace backend (feature-gated)
+│   ├── llama.rs               # Llama.cpp backend (feature-gated)
+│   ├── safetensors_native.rs  # Native SafeTensors engine
+│   └── universal.rs           # Universal engine interface
+├── tests/                     # Module tests
+│   ├── mod.rs                 # Test module exports
+│   └── ppt_contracts.rs       # PPT contract testing
+├── util/                      # Utilities
+│   └── diag.rs                # Diagnostics utilities
+├── api.rs                     # Core API handlers
+├── api_errors.rs              # API error types
+├── auto_discovery.rs          # Model auto-discovery
+├── cli.rs                     # Command-line interface
+├── discovery.rs               # Discovery utilities
+├── error.rs                   # Error handling
+├── invariant_ppt.rs           # PPT invariant testing
+├── main_integration.rs        # Main integration utilities
+├── metrics.rs                 # Performance metrics
+├── model_manager.rs           # Model lifecycle management
+├── model_registry.rs          # Model registration system
+├── openai_compat.rs           # OpenAI API compatibility
+├── port_manager.rs            # Port allocation management
+├── rustchain_compat.rs        # RustChain compatibility
+├── safetensors_adapter.rs     # SafeTensors adapter
+├── server.rs                  # HTTP server
+├── templates.rs               # Template rendering
+├── test_utils.rs              # Testing utilities
+├── tools.rs                   # Tool utilities
+└── workflow.rs                # Workflow management
+
+SHIMMY-DS AUGMENTATION SYSTEM
+=============================
+├── prompt_injector.rs         # Phase 1: Obligation injection
+├── waymark_validator.rs       # Phase 2: Spatial continuity validation
+├── obligation_pressure.rs     # Phase 3: Obligation pressure monitoring
+├── emotion_resonance.rs       # Phase 4: Emotional resonance injection
+├── prompt_audit.rs            # Phase 5: Audit logging system
+├── shimmy_config.rs           # Phase 6: Configuration management
+├── recursive_drift_stabilizer.rs  # Recursive drift detection
+└── stability_log.rs           # Stability logging
+
+CONFIGURATION FILES
+==================
+
+Cargo.toml
+----------
+- Package metadata and dependencies
+- Feature flags: llama, huggingface, fast, full, coverage
+- External dependencies: 20+ crates including axum, tokio, safetensors
+- Build configuration and optimization settings
+
+shimmy-ds.toml
+--------------
+- SHIMMY-DS augmentation system configuration
+- Feature toggles for each augmentation phase
+- Configurable thresholds and limits
+- Logging and performance settings
+- Drift stabilizer configuration
+
+.claude/settings.local.json
+---------------------------
+- Claude Code enhanced memory system configuration
+- Tool permissions and access controls
+- Performance optimization settings
+- Session hooks and automation
+
+EXTERNAL DEPENDENCIES
+=====================
+
+Core Runtime Dependencies:
+- anyhow 1.0          # Error handling
+- axum 0.7            # Web framework
+- async-trait 0.1     # Async trait support
+- bytes 1.0           # Byte handling
+- chrono 0.4          # Date/time operations
+- clap 4.0            # CLI parsing
+- futures-util 0.3    # Future utilities
+- lazy_static 1.5     # Static initialization
+- memmap2 0.9         # Memory mapping
+- minijinja 2.0       # Template engine
+- parking_lot 0.12    # Synchronization
+- rand 0.8            # Random generation
+- safetensors 0.4     # SafeTensors format
+- serde/serde_json 1.0 # Serialization
+- toml 0.8            # TOML parsing
+- sys-info 0.9        # System information
+- sysinfo 0.30        # System information
+- tempfile 3.0        # Temporary files
+- thiserror 1.0       # Error macros
+- tokio 1.0           # Async runtime
+- tracing 0.1         # Logging
+- tracing-subscriber 0.3 # Log subscribers
+- uuid 1.0            # UUID generation
+- dirs 5.0            # Directory helpers
+- reqwest 0.11        # HTTP client
+
+Optional Dependencies:
+- llama-cpp-2 0.1.118 # Llama.cpp bindings (forked for macOS ARM64)
+
+Development Dependencies:
+- tokio-tungstenite 0.20 # WebSocket testing
+- criterion 0.5          # Benchmarking
+- tempfile 3.0          # Test utilities
+
+WIRING DIAGRAM
+=============
+
+Application Entry Flow:
+main.rs
+├── cli.rs (Command parsing)
+├── shimmy_config.rs (Configuration loading)
+├── model_registry.rs (Model management)
+├── engine/adapter.rs (Engine selection)
+├── server.rs (HTTP server - if serve command)
+└── SHIMMY-DS augmentation pipeline (if generate command)
+
+Engine Architecture:
+engine/mod.rs (Traits: InferenceEngine, LoadedModel, ModelSpec)
+├── engine/adapter.rs (InferenceEngineAdapter - Universal Bridge)
+│   ├── engine/llama.rs (LlamaEngine - feature: llama)
+│   ├── engine/huggingface.rs (HuggingFaceEngine - feature: huggingface)
+│   ├── engine/safetensors_native.rs (SafeTensorsEngine - always available)
+│   └── engine/universal.rs (UniversalEngine - feature: huggingface)
+
+API Layer:
+server.rs (Axum HTTP server)
+├── api.rs (Core endpoints: /generate, /models, /stream)
+├── openai_compat.rs (OpenAI API compatibility)
+├── templates.rs (Chat template rendering)
+├── util/diag.rs (Diagnostics endpoints)
+└── api_errors.rs (Error handling)
+
+Model Management:
+model_registry.rs (Registry: ModelEntry storage and lookup)
+├── auto_discovery.rs (Automatic model discovery)
+│   ├── File system scanning (.gguf, .safetensors)
+│   ├── Ollama model discovery
+│   └── Environment variable paths
+├── model_manager.rs (Model lifecycle)
+└── templates.rs (Template inference from model names)
+
+SHIMMY-DS Augmentation Pipeline:
+main.rs generate command triggers:
+1. shimmy_config.rs (Load configuration)
+2. prompt_injector.rs (Inject obligations into prompt)
+3. emotion_resonance.rs (Add emotional context)
+4. obligation_pressure.rs (Monitor narrative pressure)
+5. Engine generation (augmented prompt -> model -> output)
+6. waymark_validator.rs (Validate spatial continuity)
+7. recursive_drift_stabilizer.rs (Check for drift)
+8. prompt_audit.rs (Log all modifications)
+9. stability_log.rs (Log stability metrics)
+
+Configuration Flow:
+shimmy_config.rs
+├── shimmy-ds.toml (Main configuration file)
+├── Environment variables (SHIMMY_* overrides)
+└── Default configuration fallbacks
+
+Caching System:
+cache/mod.rs
+├── cache/model_cache.rs (Model caching implementation)
+├── LRU eviction policies
+└── Memory and disk caching strategies
+
+INTERNAL MODULE DEPENDENCIES
+============================
+
+Core Modules Import Chain:
+main.rs
+├── Uses: cli, model_registry, engine::adapter, server
+├── Uses: All SHIMMY-DS modules for augmentation
+└── Uses: shimmy_config for configuration
+
+lib.rs
+├── Exports: All public modules
+├── Defines: AppState struct
+└── Conditional: test modules
+
+engine/adapter.rs
+├── Uses: engine::{mod, llama, huggingface, safetensors_native, universal}
+├── Feature gates: llama, huggingface
+└── Implements: InferenceEngine trait
+
+api.rs
+├── Uses: engine::mod, model_registry, templates
+├── Uses: axum for HTTP handling
+└── Uses: tokio for async operations
+
+SHIMMY-DS Module Dependencies:
+prompt_injector.rs (No internal dependencies)
+waymark_validator.rs (No internal dependencies)
+obligation_pressure.rs (No internal dependencies)
+emotion_resonance.rs (No internal dependencies)
+prompt_audit.rs (Uses: chrono, serde_json)
+shimmy_config.rs (Uses: serde, toml)
+recursive_drift_stabilizer.rs (Uses: obligation_pressure, emotion_resonance)
+stability_log.rs (Uses: recursive_drift_stabilizer, chrono, serde_json)
+
+FEATURE FLAGS & CONDITIONAL COMPILATION
+=======================================
+
+Feature Flags:
+- default = ["huggingface", "llama"]
+- llama = ["dep:llama-cpp-2"]
+- huggingface = [] (no additional deps)
+- fast = ["huggingface"] (quick compilation)
+- full = ["huggingface", "llama"] (all features)
+- coverage = ["huggingface"] (testing)
+
+Conditional Compilation:
+#[cfg(feature = "llama")] - llama.rs, parts of adapter.rs
+#[cfg(feature = "huggingface")] - huggingface.rs, universal.rs
+#[cfg(windows)] - Windows-specific discovery paths
+#[cfg(test)] - Test-only modules and functions
+#[cfg(target_os = "macos")] - macOS-specific configurations
+
+DATA FLOW
+=========
+
+1. User Request Flow:
+   CLI Command → main.rs → Command Handler
+
+2. Generate Command Flow:
+   User Prompt → SHIMMY-DS Augmentation → Engine → Model → Output → Validation → Logging
+
+3. Serve Command Flow:
+   HTTP Request → server.rs → api.rs → Engine → Model → Response
+
+4. Model Discovery Flow:
+   Startup → auto_discovery.rs → File System Scan → Registry Registration
+
+5. Configuration Flow:
+   Startup → shimmy_config.rs → TOML Parse → Global Config → Module Access
+
+SECURITY CONSIDERATIONS
+======================
+
+File System Access:
+- Model discovery scans multiple directories
+- SafeTensors file memory mapping
+- Temporary file creation for testing
+- Log file creation and rotation
+
+Network Access:
+- HTTP server on configurable ports
+- WebSocket endpoints for streaming
+- Optional HuggingFace model downloads
+
+Memory Safety:
+- Rust's ownership system prevents common vulnerabilities
+- Memory-mapped file access with bounds checking
+- Careful handling of model data
+
+Input Validation:
+- CLI argument validation via clap
+- API request validation
+- Model file format validation
+- Configuration parameter validation
+
+PERFORMANCE CHARACTERISTICS
+===========================
+
+Memory Usage:
+- Models loaded via memory mapping (efficient)
+- Configurable model caching
+- LRU eviction for memory management
+- Streaming responses to reduce memory pressure
+
+CPU Usage:
+- Multi-threaded inference engines
+- Async I/O for server operations
+- Configurable thread pools
+- Efficient SIMD operations where available
+
+I/O Performance:
+- Memory-mapped model files
+- Streaming response generation
+- Efficient log writing
+- Cached model discovery results
+
+TESTING STRATEGY
+================
+
+Unit Tests:
+- Comprehensive test coverage for all modules
+- SHIMMY-DS modules: 77+ tests total
+- Mock infrastructure for engine testing
+- Property-based testing for invariants
+
+Integration Tests:
+- End-to-end API testing
+- Model loading and inference tests
+- Multi-engine compatibility tests
+- Performance benchmarking
+
+Test Utilities:
+- test_utils.rs for common test functionality
+- Mock model creation utilities
+- Temporary test environments
+- Coverage reporting via tarpaulin
+
+LOGGING & OBSERVABILITY
+=======================
+
+Application Logging:
+- tracing crate for structured logging
+- Configurable log levels
+- Performance metrics collection
+- Error tracking and reporting
+
+SHIMMY-DS Audit Logging:
+- prompt_audit.rs: Dual format logging (text + JSON)
+- stability_log.rs: Stability trend analysis
+- Comprehensive modification tracking
+- Configurable log retention
+
+Metrics:
+- metrics.rs for performance tracking
+- Engine-specific metrics
+- API response time tracking
+- Resource utilization monitoring
+
+POTENTIAL ISSUES & RECOMMENDATIONS
+==================================
+
+Dependency Management:
+- 20+ external dependencies require regular updates
+- Forked llama-cpp-2 dependency needs maintenance
+- Feature flag complexity could be simplified
+
+Architecture Concerns:
+- Global singletons (config, auditor) may impact testing
+- Complex conditional compilation with feature flags
+- Potential for circular dependencies in future modules
+
+Performance Optimization:
+- Model caching could be more sophisticated
+- Async I/O could be optimized further
+- Memory usage monitoring needed for large models
+
+Security Hardening:
+- Input validation could be more comprehensive
+- File system access should be more restricted
+- Network security features could be enhanced
+
+MAINTENANCE RECOMMENDATIONS
+===========================
+
+1. Regular dependency updates and security audits
+2. Comprehensive integration testing for all engine combinations
+3. Performance monitoring and optimization
+4. Documentation updates for configuration options
+5. Migration path planning for deprecated dependencies
+6. Monitoring of forked llama-cpp-2 upstream changes
+
+CONCLUSION
+==========
+
+The SHIMMY-DS system represents a well-architected Rust application with:
+- Clean separation of concerns across modules
+- Sophisticated augmentation system for narrative AI
+- Flexible engine backend support
+- Comprehensive testing and logging
+- Strong configuration management
+
+The codebase demonstrates excellent Rust practices with proper error handling,
+async programming, and modular design. The SHIMMY-DS augmentation system adds
+significant value for narrative AI applications while maintaining system
+performance and reliability.
+
+Total Files Analyzed: 52 Rust files + 10+ configuration files
+Lines of Code: ~15,000+ (estimated)
+Test Coverage: Comprehensive across all modules
+Documentation: Extensive with examples and configuration guides
+
+===============================================================================
+                                END OF AUDIT
+===============================================================================

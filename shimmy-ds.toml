@@ -1,0 +1,100 @@
+# SHIMMY-DS Configuration File
+# Runtime toggles for the narrative augmentation system
+
+[shimmy-ds]
+# Enable/disable prompt injection system
+enable_prompt_injection = true
+
+# Enable/disable location validation
+enable_location_validation = true
+
+# Enable/disable emotion resonance injection
+enable_emotion_resonance = true
+
+# Enable/disable obligation pressure monitoring
+enable_pressure_monitoring = true
+
+# Enable/disable audit logging
+enable_audit_logging = true
+
+# Pressure threshold for high priority warnings (default: 1.5)
+pressure_threshold = 1.5
+
+# Default emotional intensity multiplier (0.0 to 2.0)
+emotion_intensity_multiplier = 1.0
+
+# Default chapter number (if not specified elsewhere)
+default_chapter = 1
+
+# Maximum number of obligations to inject per prompt (increased for long-form)
+max_obligations_per_prompt = 15
+
+# Context optimization for long-form writing
+[context]
+# Preferred context length for long-form writing
+preferred_ctx_length = 32768
+
+# Context retention strategy
+retain_context_between_generations = true
+
+# Number of previous generations to retain in context
+context_history_depth = 3
+
+# Enable context compression for very long sessions
+enable_context_compression = true
+
+# Compression ratio (0.0 to 1.0, higher = more aggressive)
+compression_ratio = 0.3
+
+[logging]
+# Log file paths
+text_log_path = "logs/prompt_audit.log"
+json_log_path = "logs/prompt_audit.json"
+
+# Maximum log file size in MB before rotation
+max_log_size_mb = 100
+
+# Number of rotated log files to keep
+max_log_files = 5
+
+[validation]
+# Require explicit transition words for location changes
+strict_location_validation = false
+
+# Allow implicit transitions (scene cuts, etc.)
+allow_implicit_transitions = true
+
+# Minimum confidence threshold for emotion detection (0.0 to 1.0)
+emotion_detection_threshold = 0.3
+
+[performance]
+# Cache obligation lists for better performance
+cache_obligations = true
+
+# Maximum cache age in minutes
+cache_max_age_minutes = 30
+
+# Enable performance metrics collection
+collect_metrics = false
+
+[drift_stabilizer]
+# Enable/disable recursive drift stabilizer
+enabled = true
+
+# Threshold for stale obligation warnings
+stale_obligation_threshold = 5
+
+# Limit for emotional decay warnings
+emotional_decay_limit = 2.5
+
+# Threshold for theme drift warnings
+theme_threshold = 1.0
+
+# Chapter limit for spatial pressure warnings
+spatial_pressure_chapter_limit = 3
+
+# Enable drift injection prompts when warnings are detected
+enable_drift_injection = true
+
+# Enable detailed stability logging
+enable_stability_logging = true

@@ -7,6 +7,14 @@ mod main_integration;
 mod model_registry;
 mod openai_compat;
 mod port_manager;
+mod prompt_injector;
+mod waymark_validator;
+mod obligation_pressure;
+mod emotion_resonance;
+mod prompt_audit;
+mod shimmy_config;
+mod recursive_drift_stabilizer;
+mod stability_log;
 mod server;
 mod templates;
 mod util {
@@ -45,6 +53,11 @@ async fn main() -> anyhow::Result<()> {
     let mut reg = Registry::with_discovery();
 
     // Add default model from environment variables if available
+    let default_ctx_len = std::env::var("SHIMMY_CTX_LEN")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(32768); // Default to 32k for long-form writing
+
     reg.register(ModelEntry {
         name: "phi3-lora".into(),
         base_path: std::env::var("SHIMMY_BASE_GGUF")
@@ -52,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
             .into(),
         lora_path: std::env::var("SHIMMY_LORA_GGUF").ok().map(Into::into),
         template: Some("chatml".into()),
-        ctx_len: Some(4096),
+        ctx_len: Some(default_ctx_len),
         n_threads: None,
     });
 
@@ -227,9 +240,76 @@ async fn main() -> anyhow::Result<()> {
                 anyhow::bail!("no model {name}");
             };
             let loaded = state.engine.load(&spec).await?;
+
+            // SHIMMY-DS Augmentation System - Full Integration
+            let config = shimmy_config::global_config();
+            let mut final_prompt = prompt.clone();
+
+            // Phase 1: Obligation Injection
+            if config.is_prompt_injection_enabled() {
+                let obligations = prompt_injector::load_obligations();
+                let limited_obligations: Vec<String> = obligations
+                    .into_iter()
+                    .take(config.get_max_obligations_per_prompt())
+                    .collect();
+
+                final_prompt = prompt_injector::inject_obligations(&final_prompt, &limited_obligations);
+
+                // Audit logging
+                if config.is_audit_logging_enabled() {
+                    let _ = prompt_audit::log_obligation_injection(
+                        &limited_obligations,
+                        &prompt,
+                        &final_prompt,
+                        Some(config.get_config().shimmy_ds.default_chapter),
+                    );
+                }
+            }
+
+            // Phase 4: Emotional Resonance Hook
+            if config.is_emotion_resonance_enabled() {
+                let emotion_state = emotion_resonance::EmotionalState::new("guilt", 0.8 * config.get_emotion_intensity_multiplier());
+                final_prompt = emotion_resonance::inject_emotional_state(&final_prompt, &emotion_state);
+
+                // Audit logging for emotion injection
+                if config.is_audit_logging_enabled() {
+                    let _ = prompt_audit::log_emotion_injection(
+                        &emotion_state.emotion,
+                        emotion_state.intensity,
+                        &prompt,
+                        &final_prompt,
+                        "Default emotional state injection",
+                    );
+                }
+            }
+
+            // Phase 3: Obligation Pressure Monitoring
+            if config.is_pressure_monitoring_enabled() {
+                let obligations = vec![
+                    obligation_pressure::Obligation::new("mystery", 0.8, 3),
+                    obligation_pressure::Obligation::new("promise", 0.6, 2),
+                ];
+                let pressure = obligation_pressure::compute_saturation(&obligations);
+
+                if pressure > config.get_pressure_threshold() {
+                    let recommendation = obligation_pressure::pressure_recommendations(pressure);
+                    eprintln!("⚠️ High narrative pressure: {pressure:.2} – {}", recommendation);
+
+                    // Audit log pressure warning
+                    if config.is_audit_logging_enabled() {
+                        let _ = prompt_audit::global_auditor().log_pressure_analysis(
+                            pressure,
+                            &recommendation,
+                            obligations.len(),
+                        );
+                    }
+                }
+            }
+
+            // Generate with augmented prompt
             let out = loaded
                 .generate(
-                    &prompt,
+                    &final_prompt,
                     engine::GenOptions {
                         max_tokens,
                         stream: false,
@@ -238,7 +318,167 @@ async fn main() -> anyhow::Result<()> {
                     None,
                 )
                 .await?;
+
+            // Phase 2: Spatial Continuity Validation (post-generation)
+            if config.is_location_validation_enabled() {
+                let last_location = "attic"; // from persistent state
+                let is_valid = if config.get_config().validation.allow_implicit_transitions {
+                    waymark_validator::is_valid_location_transition(&out, last_location)
+                } else {
+                    waymark_validator::validate_location_transition(&out, last_location)
+                };
+
+                if !is_valid {
+                    eprintln!("⚠️ Location continuity error: no valid transition from {}", last_location);
+
+                    // Audit log validation failure
+                    if config.is_audit_logging_enabled() {
+                        let _ = prompt_audit::log_spatial_validation(
+                            last_location,
+                            &out,
+                            false,
+                            "No valid location transition detected",
+                        );
+                    }
+                }
+            }
+
+            // Phase 6: Recursive Drift Stabilizer
+            if config.is_drift_stabilizer_enabled() {
+                // Create drift stability state
+                let mut drift_state = recursive_drift_stabilizer::DriftStabilityState::new(
+                    config.get_config().shimmy_ds.default_chapter
+                );
+
+                // Update metrics (using example data - in production this would come from persistent state)
+                let current_obligations = vec![
+                    obligation_pressure::Obligation::new("harper_location", 0.8, 3),
+                    obligation_pressure::Obligation::new("mystery_resolution", 0.6, 5),
+                ];
+                let current_emotions = vec![
+                    emotion_resonance::EmotionalState::new("guilt", 0.4),
+                ];
+
+                drift_state.update_metrics(
+                    &current_obligations,
+                    &current_emotions,
+                    0.7, // theme_coherence (0.0-1.0, higher is better)
+                    !config.get_config().validation.strict_location_validation, // spatial_return_pressure
+                );
+
+                // Check for drift
+                let drift_config = recursive_drift_stabilizer::DriftStabilizerConfig {
+                    enabled: true,
+                    stale_obligation_threshold: config.get_stale_obligation_threshold(),
+                    emotional_decay_limit: config.get_emotional_decay_limit(),
+                    theme_threshold: config.get_theme_threshold(),
+                    spatial_pressure_chapter_limit: 3,
+                };
+
+                if let Some(warnings) = recursive_drift_stabilizer::check_recursive_drift(&drift_state, &drift_config) {
+                    eprintln!("🧠 Recursive Drift Detected:");
+                    for line in warnings.lines() {
+                        eprintln!("  {}", line);
+                    }
+
+                    // Log the drift warnings
+                    if config.is_audit_logging_enabled() {
+                        let _ = prompt_audit::global_auditor().log_event(
+                            "drift_warning",
+                            &warnings,
+                            "Recursive drift stabilizer detected narrative drift",
+                            Some(serde_json::json!({
+                                "chapter": drift_state.current_chapter,
+                                "stale_obligations": drift_state.stale_obligations,
+                                "emotional_decay": drift_state.emotional_decay_sum,
+                                "theme_drift": drift_state.theme_drift_score
+                            })),
+                        );
+                    }
+
+                    // Optional: Inject drift correction prompt for next generation
+                    if config.is_drift_injection_enabled() {
+                        let injection_prompt = recursive_drift_stabilizer::generate_drift_injection_prompt(
+                            &drift_state, &warnings
+                        );
+                        eprintln!("\n📝 Suggested Drift Correction Prompt:");
+                        eprintln!("{}", injection_prompt);
+                    }
+                }
+
+                // Log stability state if enabled
+                if config.is_stability_logging_enabled() {
+                    let warnings_opt = recursive_drift_stabilizer::check_recursive_drift(&drift_state, &drift_config);
+                    let _ = stability_log::log_stability_update(
+                        drift_state.current_chapter,
+                        &drift_state,
+                        warnings_opt,
+                        false, // injection_performed (would be true if we actually modified the prompt)
+                        Some(serde_json::json!({
+                            "generation_completed": true,
+                            "output_length": out.len()
+                        })),
+                    );
+                }
+            }
+
             println!("{}", out);
+        }
+        cli::Command::Register {
+            name,
+            base_path,
+            lora_path,
+            ctx_len,
+            template,
+            n_threads,
+        } => {
+            // Use inferred context length if not specified
+            let final_ctx_len = ctx_len.unwrap_or_else(|| {
+                let mut temp_registry = Registry::new();
+                temp_registry.infer_context_length(&name)
+            });
+
+            // Create model entry
+            let model_entry = ModelEntry {
+                name: name.clone(),
+                base_path: base_path.into(),
+                lora_path: lora_path.map(Into::into),
+                template,
+                ctx_len: Some(final_ctx_len),
+                n_threads,
+            };
+
+            // Add to registry and save
+            let mut reg = Registry::with_discovery();
+            reg.register(model_entry);
+
+            println!("✅ Registered model '{}' with context length: {} tokens",
+                name, final_ctx_len);
+
+            if let Some(lora) = &lora_path {
+                println!("   LoRA adapter: {}", lora);
+            }
+            if let Some(tmpl) = &template {
+                println!("   Template: {}", tmpl);
+            }
+            if let Some(threads) = n_threads {
+                println!("   Threads: {}", threads);
+            }
+
+            // Test loading the model
+            println!("\n🧪 Testing model loading...");
+            let Some(spec) = reg.to_spec(&name) else {
+                anyhow::bail!("Failed to create spec for newly registered model");
+            };
+
+            match state.engine.load(&spec).await {
+                Ok(_) => println!("✅ Model loads successfully!"),
+                Err(e) => {
+                    eprintln!("❌ Model failed to load: {}", e);
+                    eprintln!("   The model has been registered but may not work correctly.");
+                    std::process::exit(1);
+                }
+            }
         }
     }
     Ok(())

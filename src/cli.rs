@@ -47,6 +47,26 @@ pub enum Command {
         #[arg(long, default_value_t = 64)]
         max_tokens: usize,
     },
+    /// Register a model with custom context configuration
+    Register {
+        /// Model name to register
+        name: String,
+        /// Path to the base GGUF model file
+        #[arg(long)]
+        base_path: String,
+        /// Optional path to LoRA adapter file
+        #[arg(long)]
+        lora_path: Option<String>,
+        /// Context length in tokens (defaults to auto-detection)
+        #[arg(long)]
+        ctx_len: Option<usize>,
+        /// Template type (chatml, llama3, etc.)
+        #[arg(long)]
+        template: Option<String>,
+        /// Number of threads for inference
+        #[arg(long)]
+        n_threads: Option<i32>,
+    },
 }
 
 impl Command {
@@ -186,6 +206,74 @@ mod tests {
                 assert_eq!(max_tokens, 64); // Default value
             }
             _ => panic!("Expected Bench command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_register_command_minimal() {
+        let cli = Cli::try_parse_from(&[
+            "shimmy",
+            "register",
+            "my-model",
+            "--base-path",
+            "/path/to/model.gguf",
+        ])
+        .unwrap();
+        match cli.cmd {
+            Command::Register {
+                name,
+                base_path,
+                lora_path,
+                ctx_len,
+                template,
+                n_threads,
+            } => {
+                assert_eq!(name, "my-model");
+                assert_eq!(base_path, "/path/to/model.gguf");
+                assert!(lora_path.is_none());
+                assert!(ctx_len.is_none());
+                assert!(template.is_none());
+                assert!(n_threads.is_none());
+            }
+            _ => panic!("Expected Register command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_register_command_full() {
+        let cli = Cli::try_parse_from(&[
+            "shimmy",
+            "register",
+            "my-model",
+            "--base-path",
+            "/path/to/model.gguf",
+            "--lora-path",
+            "/path/to/lora.safetensors",
+            "--ctx-len",
+            "32768",
+            "--template",
+            "llama3",
+            "--n-threads",
+            "8",
+        ])
+        .unwrap();
+        match cli.cmd {
+            Command::Register {
+                name,
+                base_path,
+                lora_path,
+                ctx_len,
+                template,
+                n_threads,
+            } => {
+                assert_eq!(name, "my-model");
+                assert_eq!(base_path, "/path/to/model.gguf");
+                assert_eq!(lora_path, Some("/path/to/lora.safetensors".to_string()));
+                assert_eq!(ctx_len, Some(32768));
+                assert_eq!(template, Some("llama3".to_string()));
+                assert_eq!(n_threads, Some(8));
+            }
+            _ => panic!("Expected Register command"),
         }
     }
 }

@@ -55,7 +55,7 @@ impl Registry {
                     base_path: discovered.path.clone(),
                     lora_path: discovered.lora_path.clone(),
                     template: Some(self.infer_template(name)),
-                    ctx_len: Some(4096),
+                    ctx_len: Some(self.infer_context_length(name)),
                     n_threads: None,
                 };
                 self.inner.insert(name.clone(), entry);
@@ -79,6 +79,44 @@ impl Registry {
             "chatml".to_string()
         } else {
             "chatml".to_string() // Default to chatml for most models
+        }
+    }
+
+    pub fn infer_context_length(&self, model_name: &str) -> usize {
+        let name_lower = model_name.to_lowercase();
+
+        // Check for high-context model indicators in name
+        if name_lower.contains("128k") || name_lower.contains("131k") {
+            131072 // 128k context
+        } else if name_lower.contains("32k") || name_lower.contains("33k") {
+            32768  // 32k context
+        } else if name_lower.contains("16k") {
+            16384  // 16k context
+        } else if name_lower.contains("8k") {
+            8192   // 8k context
+        } else if name_lower.contains("phi-3") || name_lower.contains("phi3") {
+            // Phi-3 models typically support 4k-128k
+            if name_lower.contains("mini") && !name_lower.contains("128k") {
+                4096  // Phi-3 Mini default
+            } else {
+                32768 // Assume larger context for other Phi-3 variants
+            }
+        } else if name_lower.contains("llama-3") || name_lower.contains("llama3") {
+            // Llama 3 models support 8k+ context
+            if name_lower.contains("8b") || name_lower.contains("70b") {
+                8192  // Standard Llama 3 context
+            } else {
+                32768 // Larger variants may support more
+            }
+        } else if name_lower.contains("qwen") {
+            // Qwen models often support large context
+            32768
+        } else if name_lower.contains("mistral") {
+            // Mistral models typically 32k+
+            32768
+        } else {
+            // Default to 16k for long-form writing (up from 4k)
+            16384
         }
     }
 

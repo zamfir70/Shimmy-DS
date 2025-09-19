@@ -23,6 +23,16 @@ pub mod util {
 pub mod invariant_ppt;
 pub mod workflow;
 
+// SHIMMY-DS Augmentation System
+pub mod prompt_injector;
+pub mod waymark_validator;
+pub mod obligation_pressure;
+pub mod emotion_resonance;
+pub mod prompt_audit;
+pub mod shimmy_config;
+pub mod recursive_drift_stabilizer;
+pub mod stability_log;
+
 #[cfg(test)]
 pub mod tests;
 
