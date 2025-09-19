@@ -31,9 +31,16 @@
 
 ---
 
-## Drop-in OpenAI API Replacement + Advanced Narrative Intelligence
+## Shimmy + Revolutionary Narrative Intelligence = Shimmy-DS
 
-Shimmy is a **5.1MB single-binary** that provides **100% OpenAI-compatible endpoints** for GGUF models with **revolutionary recursive narrative tracking**. Point your existing AI tools to Shimmy and they just work — locally, privately, and with unprecedented narrative intelligence.
+**Shimmy-DS** extends the proven [Shimmy](https://github.com/Michael-A-Kuykendall/shimmy) infrastructure with **world-first recursive narrative intelligence**. Built on Shimmy's **5.1MB single-binary** foundation that provides **100% OpenAI-compatible endpoints**, Shimmy-DS adds six integrated narrative intelligence systems that transform any LLM from text generation into narrative understanding.
+
+### 🏗️ **Built on Proven Foundation**
+- **Base**: Shimmy's battle-tested OpenAI-compatible server
+- **Enhancement**: 6 integrated recursive narrative systems  
+- **Result**: Local AI with unprecedented story intelligence
+
+Point your existing AI tools to Shimmy-DS and they work exactly like before — but now with deep narrative understanding.
 
 ### ✨ **NEW: Recursive Narrative System**
 
@@ -49,14 +56,16 @@ Shimmy now includes the **world's first implementation** of recursive narrative 
 ### Try it in 30 seconds
 
 ```bash
-# 1) Install + run
+# Option 1: Quick start with Shimmy-DS
+git clone https://github.com/YOUR-REPO/shimmy-ds
+cd shimmy-ds
+cargo run --release --features full -- serve --narrative-intelligence
+
+# Option 2: Install original Shimmy (without narrative intelligence)
 cargo install shimmy --features huggingface
-shimmy serve &
+shimmy serve
 
-# 2) See models and pick one
-shimmy list
-
-# 3) Smoke test the OpenAI API
+# 3) Test OpenAI API with narrative intelligence
 curl -s http://127.0.0.1:11435/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
@@ -64,9 +73,20 @@ curl -s http://127.0.0.1:11435/v1/chat/completions \
     "messages": [{"role": "user", "content": "Write a recursive story about mirrors."}],
     "max_tokens": 500
   }' | jq -r '.choices[0].message.content'
+
+# 4) Check narrative intelligence (Shimmy-DS only)
+curl http://127.0.0.1:11435/narrative/analyze
 ```
 
-**That's it.** Shimmy automatically downloads models, loads them, and serves them via OpenAI API — now with optional recursive narrative intelligence.
+**That's it.** Shimmy-DS automatically downloads models, loads them, and serves them via OpenAI API — enhanced with recursive narrative intelligence.
+
+### 🎬 **Live Demo**
+
+```bash
+# Run the narrative intelligence demo
+chmod +x demo-narrative-intelligence.sh
+./demo-narrative-intelligence.sh
+```
 
 ## 🎯 Why Choose Shimmy + Recursive Intelligence?
 
@@ -87,6 +107,31 @@ curl -s http://127.0.0.1:11435/v1/chat/completions \
 | 👥 **Character Engine** | Personality & voice consistency | Character development, dialogue |
 | 📚 **Engagement Loops** | Reader psychology tracking | Audience retention, pacing |
 | ⚖️ **Drift Prevention** | Long-term stability monitoring | Series writing, collaborative projects |
+
+### ✨ **NEW: Elegance Modules (EAT + FPD + RIE-lite)**
+
+**Minimal Elegance Upgrade** - Three lightweight modules that plug into the existing RIP+RIC pipeline to provide maximum creative power with minimal complexity:
+
+| Module | Purpose | Creative Power |
+|--------|---------|----------------|
+| 🎭 **EAT (Emotional Arc Tracker)** | Per-character, per-beat emotion tracking | Emotional continuity, character development |
+| 🎪 **FPD (Foreshadowing & Payoff Detector)** | Setup→payoff lattice with satisfaction scoring | Promise tracking, narrative satisfaction |
+| 🎨 **RIE-lite (Recursive Inquiry Engine)** | Contextual creative questions with followups | Creative exploration, story deepening |
+
+**Key Benefits:**
+- **✅ Zero Breaking Changes**: 100% backward compatible with existing RIP+RIC
+- **✅ Light Integration**: Optional loading with graceful degradation
+- **✅ MirrorPass Continuity**: Seamless integration with hardened pipeline
+- **✅ Creative Intelligence**: EAT emotions + FPD promises + RIE questions = narrative depth
+
+```bash
+# Access elegance modules via new endpoints
+curl http://127.0.0.1:11435/narrative/emotional-analysis  # EAT
+curl http://127.0.0.1:11435/narrative/foreshadowing-health # FPD
+curl http://127.0.0.1:11435/narrative/creative-inquiries   # RIE-lite
+```
+
+**Design Philosophy**: "Increase creative power without complexity by adding three light modules that plug into existing RIP+RIC without exploding file surface or creating new subsystems."
 
 ## 🚀 Quick Start Guide
 
@@ -381,6 +426,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [Installation Guide](docs/INSTALLATION.md) - Setup and configuration
 - [API Reference](docs/API.md) - Complete endpoint documentation
 - [Model Support](docs/MODELS.md) - Supported model formats
+- [Shimmy vs Shimmy-DS](docs/SHIMMY_VS_SHIMMY_DS.md) - Complete feature comparison
 
 ### **Narrative Intelligence Documentation**
 - [Recursive Narrative Guide](docs/NARRATIVE_INTELLIGENCE.md) - Complete system overview

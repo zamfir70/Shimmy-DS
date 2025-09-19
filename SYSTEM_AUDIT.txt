@@ -33,6 +33,53 @@ KEY INNOVATIONS:
 - Fail-Closed Protection: Sovereignty-preserving defensive mechanisms
 - Unified Protocol Logging: Comprehensive cross-system audit trails
 
+LATEST UPGRADE: ELEGANCE MODULES (EAT + FPD + RIE-lite)
+======================================================
+✨ MINIMAL ELEGANCE UPGRADE: Three lightweight modules that plug into the existing
+   RIP+RIC pipeline to provide maximum creative power with minimal complexity.
+
+ELEGANCE MODULES INNOVATIONS:
+- EAT (Emotional Arc Tracker): Per-character, per-beat emotion tracking with continuity validation
+- FPD (Foreshadowing & Payoff Detector): Setup→payoff lattice with automatic detection and satisfaction scoring
+- RIE-lite (Recursive Inquiry Engine): Contextual creative questions with recursive followup generation
+- Light Integration Hooks: Minimal surface area integration with graceful degradation
+- Zero Breaking Changes: 100% backward compatible with existing RIP+RIC pipeline
+- MirrorPass Continuity: Seamless integration with hardened narrative pipeline
+
+DESIGN PHILOSOPHY: "Increase creative power without complexity by adding three light
+                    modules that plug into existing RIP+RIC without exploding file
+                    surface or creating new subsystems."
+
+ELEGANCE MODULE DETAILS:
+------------------------
+✨ EAT (Emotional Arc Tracker) - src/dreamspiral/emotional_arc_tracker.py
+   - EmotionalPoint: Single emotional state measurement at narrative moments
+   - EmotionalBeatState: Complete emotional state for character during specific beat
+   - EmotionalArcTracker: Character-focused emotional trajectory tracking
+   - Features: Emotional intensity/valence tracking, arc momentum calculation,
+              pattern violation detection, RIP constraint validation
+
+✨ FPD (Foreshadowing & Payoff Detector) - src/dreamspiral/foreshadowing_detector.py
+   - ForeshadowingSetup: Narrative setup creating expectation for future payoff
+   - NarrativePayoff: Resolution/payoff of previous setup with satisfaction scoring
+   - SetupPayoffLattice: Complete mapping of setup→payoff relationships
+   - Features: Automatic setup/payoff detection, timing accuracy calculation,
+              satisfaction scoring, orphaned promise tracking
+
+✨ RIE-lite (Recursive Inquiry Engine) - src/dreamspiral/inquiry_bank.py
+   - InquiryTemplate: Template for generating contextual questions with placeholders
+   - ActiveInquiry: Generated question for specific narrative context with answers
+   - RecursiveInquiryEngine: Question generation engine with followup loops
+   - Features: 20+ inquiry templates, context-aware generation, recursive followups,
+              exploration path discovery, seed/beat-bound question tracking
+
+INTEGRATION STRATEGY:
+- Light hooks in recursive_expander.py and recursive_growth_pass.py
+- Optional loading with try/except import protection
+- Graceful degradation if modules unavailable
+- Export functions for RIP constraint validation
+- Health monitoring for all three modules
+
 DIRECTORY STRUCTURE
 ==================
 
@@ -127,14 +174,18 @@ src/
 │
 ├── 🧬 RIP (RECURSIVE INTEGRITY PROTOCOL) - PYTHON COMPONENTS
 │   ├── dreamspiral/
-│   │   ├── recursive_expander.py      # 🆕 Constraint genome + 4-layer guard chain
+│   │   ├── recursive_expander.py      # 🆕 Constraint genome + 4-layer guard chain (+ EAT/FPD/RIE hooks)
 │   │   ├── drift_detector.py          # 🆕 6-pathogen detection library
-│   │   ├── recursive_growth_pass.py   # 🆕 ZC gates + loop saturation control
+│   │   ├── recursive_growth_pass.py   # 🆕 ZC gates + loop saturation control (+ FPD hooks)
+│   │   ├── emotional_arc_tracker.py   # 🆕✨ EAT: Per-character emotion tracking
+│   │   ├── foreshadowing_detector.py  # 🆕✨ FPD: Setup→payoff lattice detection
+│   │   ├── inquiry_bank.py            # 🆕✨ RIE-lite: Contextual creative questions
 │   │   └── __init__.py                # Python package initialization
 │   ├── scripts/
 │   │   └── rip_bridge.py              # 🆕 Python-Rust communication bridge
 │   └── tests/
 │       ├── test_rip_bridge.py         # 🆕 RIP bridge unit tests
+│       ├── test_elegance_modules.py   # 🆕✨ EAT/FPD/RIE-lite comprehensive tests
 │       └── rip_ric_integration_tests.rs # 🆕 Cross-language integration tests
 │
 └── SHIMMY-DS AUGMENTATION SYSTEM (LEGACY)

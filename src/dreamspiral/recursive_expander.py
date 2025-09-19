@@ -19,6 +19,16 @@ from enum import Enum
 import asyncio
 from datetime import datetime
 
+# Minimal Elegance Modules (EAT + FPD + RIE-lite) - Light Integration
+try:
+    from .emotional_arc_tracker import EmotionalArcTracker, EmotionalIntensity, EmotionalValence
+    from .foreshadowing_detector import ForeshadowingPayoffDetector, SetupType, PayoffTiming
+    from .inquiry_bank import RecursiveInquiryEngine, InquiryType, InquiryDepth
+    ELEGANCE_MODULES_AVAILABLE = True
+except ImportError:
+    ELEGANCE_MODULES_AVAILABLE = False
+    logger.warning("Elegance modules (EAT/FPD/RIE-lite) not available - operating in basic mode")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -104,10 +114,22 @@ class RecursiveExpander:
     """
 
     def __init__(self, ric_integration=None):
-        """Initialize with optional RIC integration"""
+        """Initialize with optional RIC integration and Elegance modules"""
         self.ric_integration = ric_integration
         self.expansion_history: List[Tuple[ExpansionCandidate, GuardChainResult]] = []
         self.ligand_extraction_patterns = self._init_extraction_patterns()
+
+        # Initialize Elegance modules (EAT + FPD + RIE-lite) if available
+        self.elegance_modules = {}
+        if ELEGANCE_MODULES_AVAILABLE:
+            self.elegance_modules = {
+                'eat': EmotionalArcTracker(),
+                'fpd': ForeshadowingPayoffDetector(),
+                'rie': RecursiveInquiryEngine()
+            }
+            logger.info("Elegance modules (EAT/FPD/RIE-lite) initialized successfully")
+        else:
+            logger.info("Operating without elegance modules - basic RIP+RIC only")
 
     def _init_extraction_patterns(self) -> Dict[LigandType, List[str]]:
         """Initialize regex patterns for ligand extraction"""
@@ -485,9 +507,18 @@ class RecursiveExpander:
                                max_iterations: int = 10) -> List[str]:
         """
         Perform recursive expansion with RIP+RIC protocol integration.
+        Enhanced with Elegance modules (EAT/FPD/RIE-lite) for creative power.
         Returns list of validated expansions.
         """
         logger.info(f"Starting recursive expansion with max {max_iterations} iterations")
+
+        # Light elegance hooks - minimal surface area
+        if 'eat' in self.elegance_modules:
+            self._track_initial_emotional_state(constraint_genome)
+        if 'fpd' in self.elegance_modules:
+            self._detect_narrative_setups(constraint_genome)
+        if 'rie' in self.elegance_modules:
+            self._generate_creative_inquiries(constraint_genome)
 
         expansions = []
         iteration = 0
@@ -603,6 +634,138 @@ class RecursiveExpander:
                 stats["failed_surface_depth"] += 1
 
         return stats
+
+    # ========== ELEGANCE MODULES INTEGRATION (EAT + FPD + RIE-lite) ==========
+    # Light hooks - minimal surface area, maximum creative power
+
+    def _track_initial_emotional_state(self, constraint_genome: ConstraintGenome):
+        """EAT Integration: Track emotional states at expansion start"""
+        if 'eat' not in self.elegance_modules:
+            return
+
+        eat_tracker = self.elegance_modules['eat']
+        beat_id = f"expansion_{len(self.expansion_history)}"
+
+        # Extract emotional content from beat and seed
+        for character in constraint_genome.characters:
+            # Simple emotion detection for initial state
+            combined_text = f"{constraint_genome.seed_text} {constraint_genome.beat_text}"
+            emotion_type = self._detect_primary_emotion(combined_text, character)
+
+            if emotion_type:
+                emotional_point = eat_tracker.track_emotional_point(
+                    character_name=character,
+                    beat_id=beat_id,
+                    emotion_type=emotion_type,
+                    intensity=EmotionalIntensity.MODERATE,  # Default, could be enhanced
+                    valence=EmotionalValence.NEUTRAL,  # Default, could be enhanced
+                    context=f"Expansion start: {constraint_genome.beat_text[:50]}..."
+                )
+
+                eat_tracker.create_beat_state(
+                    character_name=character,
+                    beat_id=beat_id,
+                    primary_emotion=emotional_point
+                )
+
+    def _detect_narrative_setups(self, constraint_genome: ConstraintGenome):
+        """FPD Integration: Detect potential setups during expansion"""
+        if 'fpd' not in self.elegance_modules:
+            return
+
+        fpd_detector = self.elegance_modules['fpd']
+        beat_id = f"expansion_{len(self.expansion_history)}"
+
+        # Check for setup patterns in obligations and constraints
+        for obligation in constraint_genome.obligations:
+            setup = fpd_detector.detect_setup(
+                beat_id=beat_id,
+                content=obligation,
+                characters=constraint_genome.characters
+            )
+
+            if setup:
+                logger.debug(f"FPD detected setup: {setup.setup_type.value} - {setup.content[:50]}...")
+
+    def _generate_creative_inquiries(self, constraint_genome: ConstraintGenome):
+        """RIE-lite Integration: Generate contextual creative questions"""
+        if 'rie' not in self.elegance_modules:
+            return
+
+        rie_engine = self.elegance_modules['rie']
+        seed_id = f"seed_{len(self.expansion_history)}"
+        beat_id = f"expansion_{len(self.expansion_history)}"
+
+        # Create context for inquiry generation
+        inquiry_context = {
+            'characters': constraint_genome.characters,
+            'obligations': constraint_genome.obligations,
+            'tone': constraint_genome.tone_vector,
+            'entities': constraint_genome.scope_entities,
+            'seed_text': constraint_genome.seed_text,
+            'beat_text': constraint_genome.beat_text
+        }
+
+        # Generate inquiries for each character
+        for character in constraint_genome.characters:
+            char_context = inquiry_context.copy()
+            char_context['character'] = character
+
+            # Generate character-focused inquiry
+            inquiry = rie_engine.generate_inquiry(
+                seed_id=seed_id,
+                beat_id=beat_id,
+                context=char_context,
+                inquiry_type=InquiryType.CHARACTER_DEPTH,
+                depth=InquiryDepth.MEDIUM
+            )
+
+            if inquiry:
+                logger.debug(f"RIE generated inquiry for {character}: {inquiry.question[:50]}...")
+
+    def _detect_primary_emotion(self, text: str, character: str) -> Optional[str]:
+        """Simple emotion detection for EAT integration"""
+        text_lower = text.lower()
+        character_lower = character.lower()
+
+        # Look for character-specific emotional indicators
+        emotion_patterns = {
+            'fear': ['afraid', 'scared', 'terrified', 'anxious', 'worried'],
+            'joy': ['happy', 'glad', 'excited', 'delighted', 'pleased'],
+            'anger': ['angry', 'furious', 'mad', 'irritated', 'frustrated'],
+            'sadness': ['sad', 'disappointed', 'grief', 'sorrow', 'melancholy'],
+            'surprise': ['surprised', 'shocked', 'amazed', 'astonished'],
+            'determination': ['determined', 'resolved', 'decided', 'committed'],
+            'confusion': ['confused', 'puzzled', 'uncertain', 'unclear']
+        }
+
+        # Look for emotions near character mentions
+        for emotion, keywords in emotion_patterns.items():
+            for keyword in keywords:
+                if keyword in text_lower:
+                    # Simple proximity check - if character mentioned nearby
+                    if character_lower in text_lower:
+                        return emotion
+
+        return None
+
+    def get_elegance_health_summary(self) -> Dict[str, Any]:
+        """Get health summary from all elegance modules"""
+        if not ELEGANCE_MODULES_AVAILABLE:
+            return {'status': 'unavailable', 'message': 'Elegance modules not loaded'}
+
+        summary = {
+            'status': 'active',
+            'modules': {}
+        }
+
+        for module_name, module in self.elegance_modules.items():
+            try:
+                summary['modules'][module_name] = module.get_tracker_health()
+            except Exception as e:
+                summary['modules'][module_name] = {'error': str(e)}
+
+        return summary
 
 
 # Example usage and testing

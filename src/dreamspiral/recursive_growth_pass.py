@@ -21,6 +21,16 @@ from enum import Enum
 from datetime import datetime, timedelta
 import json
 
+# Minimal Elegance Modules (EAT + FPD + RIE-lite) - Light Integration
+try:
+    from .emotional_arc_tracker import EmotionalArcTracker
+    from .foreshadowing_detector import ForeshadowingPayoffDetector
+    from .inquiry_bank import RecursiveInquiryEngine
+    ELEGANCE_MODULES_AVAILABLE = True
+except ImportError:
+    ELEGANCE_MODULES_AVAILABLE = False
+    logger.warning("Elegance modules (EAT/FPD/RIE-lite) not available - operating in basic mode")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -133,6 +143,18 @@ class RecursiveGrowthPass:
             expansion_history=[],
             saturation_detected=False
         )
+
+        # Initialize Elegance modules (EAT + FPD + RIE-lite) if available
+        self.elegance_modules = {}
+        if ELEGANCE_MODULES_AVAILABLE:
+            self.elegance_modules = {
+                'eat': EmotionalArcTracker(),
+                'fpd': ForeshadowingPayoffDetector(),
+                'rie': RecursiveInquiryEngine()
+            }
+            logger.info("Growth Pass: Elegance modules (EAT/FPD/RIE-lite) initialized")
+        else:
+            logger.info("Growth Pass: Operating without elegance modules")
         self.growth_metrics = GrowthMetrics(
             total_iterations=0,
             successful_expansions=0,
@@ -186,6 +208,10 @@ class RecursiveGrowthPass:
             List of validated expansions
         """
         logger.info(f"Starting recursive growth pass (max {max_iterations} iterations)")
+
+        # Light elegance hooks - payoff detection for growth optimization
+        if 'fpd' in self.elegance_modules:
+            self._check_payoff_opportunities(constraint_genome)
 
         expansions = []
         iteration = 0
@@ -484,6 +510,52 @@ class RecursiveGrowthPass:
             "saturation_detected": self.recursion_state.saturation_detected,
             "gate_statistics": gate_stats
         }
+
+
+    # ========== ELEGANCE MODULES INTEGRATION (Light hooks) ==========
+
+    def _check_payoff_opportunities(self, constraint_genome):
+        """FPD Integration: Look for payoff opportunities during growth pass"""
+        if 'fpd' not in self.elegance_modules:
+            return
+
+        fpd_detector = self.elegance_modules['fpd']
+
+        # Check if any setups are ready for payoff based on growth phase
+        if self.recursion_state.current_phase in [GrowthPhase.EXPANSION, GrowthPhase.REFINEMENT]:
+            # Get orphaned setups that might need payoffs
+            fpd_export = fpd_detector.export_for_rip_integration()
+            orphaned_setups = fpd_export.get('orphaned_setups', [])
+
+            if orphaned_setups and len(orphaned_setups) > 3:  # Many unfulfilled promises
+                logger.debug(f"FPD: {len(orphaned_setups)} orphaned setups detected - consider payoff generation")
+
+    def get_elegance_insights(self) -> Dict[str, Any]:
+        """Get insights from elegance modules for growth optimization"""
+        if not ELEGANCE_MODULES_AVAILABLE:
+            return {'status': 'unavailable'}
+
+        insights = {
+            'status': 'active',
+            'modules': {}
+        }
+
+        for module_name, module in self.elegance_modules.items():
+            try:
+                if hasattr(module, 'export_for_rip_integration'):
+                    module_export = module.export_for_rip_integration()
+                    insights['modules'][module_name] = {
+                        'health': module.get_tracker_health(),
+                        'rip_data': module_export
+                    }
+                else:
+                    insights['modules'][module_name] = {
+                        'health': module.get_tracker_health()
+                    }
+            except Exception as e:
+                insights['modules'][module_name] = {'error': str(e)}
+
+        return insights
 
 
 @dataclass
