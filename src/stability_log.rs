@@ -596,7 +596,7 @@ impl StabilityLogger {
         chapters.sort();
 
         for &chapter in chapters {
-            let entries = chapter_groups.get(chapter).unwrap();
+            let entries = chapter_groups.get(&chapter).unwrap();
             let latest_entry = entries.iter().max_by_key(|e| e.timestamp).unwrap();
 
             report.push_str(&format!("Chapter {}: ", chapter));
@@ -1263,12 +1263,12 @@ pub mod telemetry_integration {
         });
 
         // Log to console
-        log::info!("Qualitier quality change: {:?} -> {:?} (Ch.{}, mem_pressure:{:.2}, narrative_stress:{:.2})",
+        tracing::info!("Qualitier quality change: {:?} -> {:?} (Ch.{}, mem_pressure:{:.2}, narrative_stress:{:.2})",
             old_level, new_level, chapter, memory_pressure, narrative_stress);
 
         // Write to stability log file if enabled
         if let Err(e) = write_qualitier_log_entry(&log_entry) {
-            log::warn!("Failed to write Qualitier log entry: {}", e);
+            tracing::warn!("Failed to write Qualitier log entry: {}", e);
         }
     }
 
@@ -1288,11 +1288,11 @@ pub mod telemetry_integration {
             "memory_usage_mb": memory_usage_mb
         });
 
-        log::warn!("Qualitier performance degradation: {} (Ch.{}, level:{:?}, memory:{}MB)",
+        tracing::warn!("Qualitier performance degradation: {} (Ch.{}, level:{:?}, memory:{}MB)",
             reason, chapter, current_level, memory_usage_mb);
 
         if let Err(e) = write_qualitier_log_entry(&log_entry) {
-            log::warn!("Failed to write Qualitier degradation log: {}", e);
+            tracing::warn!("Failed to write Qualitier degradation log: {}", e);
         }
     }
 
@@ -1314,11 +1314,11 @@ pub mod telemetry_integration {
             "drift_hits": drift_hits
         });
 
-        log::info!("Qualitier narrative stress upgrade: {:?} (Ch.{}, pathogens:{}, ADI:{:.2}, drift:{})",
+        tracing::info!("Qualitier narrative stress upgrade: {:?} (Ch.{}, pathogens:{}, ADI:{:.2}, drift:{})",
             current_level, chapter, pathogen_count, adi_score, drift_hits);
 
         if let Err(e) = write_qualitier_log_entry(&log_entry) {
-            log::warn!("Failed to write Qualitier stress upgrade log: {}", e);
+            tracing::warn!("Failed to write Qualitier stress upgrade log: {}", e);
         }
     }
 
@@ -1625,12 +1625,12 @@ pub mod obli_select_telemetry {
             context
         );
 
-        log::info!("{}", log_entry);
+        tracing::info!("{}", log_entry);
 
         // Log detailed scoring if debug level is enabled
-        if log::log_enabled!(log::Level::Debug) {
+        if tracing::enabled!(tracing::Level::DEBUG) {
             for score in selected_obligations {
-                log::debug!(
+                tracing::debug!(
                     "  └─ {} (total:{:.3}) urgency:{:.3} salience:{:.3} fresh:{:.3} tension:{:.3} dep:{:.3} context:{:.3} | {}",
                     score.obligation_id,
                     score.total_score,
@@ -1671,7 +1671,7 @@ pub mod obli_select_telemetry {
         });
 
         if let Err(e) = write_json_log_entry("logs/obli_select.json", &json_entry) {
-            log::warn!("Failed to write ObliSelect JSON log: {}", e);
+            tracing::warn!("Failed to write ObliSelect JSON log: {}", e);
         }
     }
 
@@ -1692,10 +1692,10 @@ pub mod obli_select_telemetry {
             metrics.fulfillment_progress_average * 100.0
         );
 
-        log::info!("{}", log_entry);
+        tracing::info!("{}", log_entry);
 
         // Log tension distribution
-        log::debug!(
+        tracing::debug!(
             "  Tension Distribution: {:.1}% negative, {:.1}% neutral, {:.1}% positive",
             metrics.tension_distribution.0 * 100.0,
             metrics.tension_distribution.1 * 100.0,
@@ -1703,15 +1703,15 @@ pub mod obli_select_telemetry {
         );
 
         // Log category and urgency distributions
-        if log::log_enabled!(log::Level::Debug) {
-            log::debug!("  Category Distribution:");
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            tracing::debug!("  Category Distribution:");
             for (category, count) in &metrics.obligations_by_category {
-                log::debug!("    {:?}: {}", category, count);
+                tracing::debug!("    {:?}: {}", category, count);
             }
 
-            log::debug!("  Urgency Distribution:");
+            tracing::debug!("  Urgency Distribution:");
             for (urgency, count) in &metrics.obligations_by_urgency {
-                log::debug!("    {:?}: {}", urgency, count);
+                tracing::debug!("    {:?}: {}", urgency, count);
             }
         }
 
@@ -1760,7 +1760,7 @@ pub mod obli_select_telemetry {
         });
 
         if let Err(e) = write_json_log_entry("logs/obli_select_metrics.json", &json_entry) {
-            log::warn!("Failed to write ObliSelect metrics JSON log: {}", e);
+            tracing::warn!("Failed to write ObliSelect metrics JSON log: {}", e);
         }
     }
 
@@ -1786,10 +1786,10 @@ pub mod obli_select_telemetry {
         );
 
         match event_type {
-            "ADD" => log::info!("{}", log_entry),
-            "REMOVE" | "FULFILL" => log::info!("{}", log_entry),
-            "UPDATE" => log::debug!("{}", log_entry),
-            _ => log::debug!("{}", log_entry),
+            "ADD" => tracing::info!("{}", log_entry),
+            "REMOVE" | "FULFILL" => tracing::info!("{}", log_entry),
+            "UPDATE" => tracing::debug!("{}", log_entry),
+            _ => tracing::debug!("{}", log_entry),
         }
 
         // Write lifecycle event to JSON log
@@ -1806,7 +1806,7 @@ pub mod obli_select_telemetry {
         });
 
         if let Err(e) = write_json_log_entry("logs/obli_select_lifecycle.json", &json_entry) {
-            log::warn!("Failed to write ObliSelect lifecycle JSON log: {}", e);
+            tracing::warn!("Failed to write ObliSelect lifecycle JSON log: {}", e);
         }
     }
 
@@ -1828,7 +1828,7 @@ pub mod obli_select_telemetry {
             obligation_count
         );
 
-        log::warn!("{}", log_entry);
+        tracing::warn!("{}", log_entry);
 
         // Write performance warning to JSON log
         let json_entry = serde_json::json!({
@@ -1843,7 +1843,7 @@ pub mod obli_select_telemetry {
         });
 
         if let Err(e) = write_json_log_entry("logs/obli_select_performance.json", &json_entry) {
-            log::warn!("Failed to write ObliSelect performance JSON log: {}", e);
+            tracing::warn!("Failed to write ObliSelect performance JSON log: {}", e);
         }
     }
 

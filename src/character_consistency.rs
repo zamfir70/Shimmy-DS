@@ -153,6 +153,41 @@ pub struct CharacterProfile {
     pub last_updated: DateTime<Utc>,
 }
 
+impl CharacterProfile {
+    /// Extract emotion sequences for narrative analysis
+    pub fn extract_emotion_sequences(&self) -> (Vec<f32>, Vec<f32>, Vec<String>) {
+        // Extract emotion data from personality traits and character arc
+        let mut valence_seq = Vec::new();
+        let mut intensity_seq = Vec::new();
+        let mut emotions = Vec::new();
+
+        // Get emotions from personality traits
+        for (trait_name, personality_trait) in &self.personality_traits {
+            // Map personality traits to emotional valence and intensity
+            let valence = match trait_name.as_str() {
+                "optimistic" | "cheerful" | "confident" => 0.8,
+                "pessimistic" | "moody" | "anxious" => -0.6,
+                "angry" | "hostile" => -0.8,
+                "calm" | "peaceful" => 0.3,
+                _ => 0.0,
+            };
+
+            valence_seq.push(valence);
+            intensity_seq.push(personality_trait.intensity);
+            emotions.push(trait_name.clone());
+        }
+
+        // If no emotions found, provide default
+        if valence_seq.is_empty() {
+            valence_seq.push(0.0);
+            intensity_seq.push(0.5);
+            emotions.push("neutral".to_string());
+        }
+
+        (valence_seq, intensity_seq, emotions)
+    }
+}
+
 /// Main character consistency tracking system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CharacterConsistencyEngine {
@@ -271,8 +306,10 @@ impl CharacterConsistencyEngine {
 
     /// Records a dialogue sample for voice consistency analysis
     pub fn record_dialogue(&mut self, character_name: &str, dialogue: &str, emotional_context: &str) {
+        // Calculate voice consistency first while we have immutable access
+        let voice_consistency = self.analyze_voice_consistency(character_name, dialogue);
+
         if let Some(character) = self.characters.get_mut(character_name) {
-            let voice_consistency = self.analyze_voice_consistency(character_name, dialogue);
 
             // Update dialogue pattern
             character.dialogue_pattern.consistency_score = voice_consistency;
@@ -330,7 +367,7 @@ impl CharacterConsistencyEngine {
                 }
             }
 
-            consistency_score.max(0.0).min(1.0)
+            (consistency_score as f32).max(0.0).min(1.0)
         } else {
             0.0
         }
@@ -364,18 +401,18 @@ impl CharacterConsistencyEngine {
         if let Some(character) = self.characters.get(character_name) {
             let mut consistency_score = 0.5; // Neutral baseline
 
-            for trait in character.personality_traits.values() {
+            for personality_trait in character.personality_traits.values() {
                 // Check if action aligns with trait manifestations
-                for manifestation in &trait.manifestations {
+                for manifestation in &personality_trait.manifestations {
                     if action.to_lowercase().contains(&manifestation.to_lowercase()) {
-                        consistency_score += trait.intensity * 0.2;
+                        consistency_score += personality_trait.intensity * 0.2;
                     }
                 }
 
                 // Check if action contradicts trait
-                for contradiction in &trait.contradictions {
+                for contradiction in &personality_trait.contradictions {
                     if action.to_lowercase().contains(&contradiction.to_lowercase()) {
-                        consistency_score -= trait.intensity * trait.stability * 0.3;
+                        consistency_score -= personality_trait.intensity * personality_trait.stability * 0.3;
                     }
                 }
             }
@@ -387,7 +424,7 @@ impl CharacterConsistencyEngine {
                 }
             }
 
-            consistency_score.max(0.0).min(1.0)
+            (consistency_score as f32).max(0.0).min(1.0)
         } else {
             0.0
         }
@@ -889,7 +926,7 @@ impl CharacterConsistencyEngine {
         if let Some(character) = self.characters.get(character_name) {
             // Constraint 1: Core Personality Ligand Anchor
             let personality_anchor_strength = character.personality_traits.values()
-                .map(|trait| trait.intensity * trait.stability)
+                .map(|personality_trait| personality_trait.intensity * personality_trait.stability)
                 .sum::<f32>() / character.personality_traits.len().max(1) as f32;
 
             if personality_anchor_strength < 0.4 {
@@ -980,7 +1017,7 @@ impl CharacterConsistencyEngine {
             // Calculate component health scores
             let voice_health = character.dialogue_pattern.consistency_score;
             let personality_health = character.personality_traits.values()
-                .map(|trait| trait.intensity * trait.stability)
+                .map(|personality_trait| personality_trait.intensity * personality_trait.stability)
                 .sum::<f32>() / character.personality_traits.len().max(1) as f32;
 
             let arc_health = if let Some(arc) = &character.character_arc {
@@ -1018,6 +1055,16 @@ impl CharacterConsistencyEngine {
         } else {
             None
         }
+    }
+
+    /// Get character profile by name
+    pub fn get_character_profile(&self, character_name: &str) -> Option<&CharacterProfile> {
+        self.characters.get(character_name)
+    }
+
+    /// Get all character profiles
+    pub fn get_all_profiles(&self) -> Vec<&CharacterProfile> {
+        self.characters.values().collect()
     }
 }
 

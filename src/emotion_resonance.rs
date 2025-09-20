@@ -4,8 +4,10 @@
 /// This module provides functionality to inject emotional context into prompts
 /// to maintain emotional continuity and enhance narrative depth.
 
+use serde::{Deserialize, Serialize};
+
 /// Represents an emotional state with intensity
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EmotionalState {
     /// The primary emotion (e.g., "joy", "fear", "anger", "sadness")
     pub emotion: String,

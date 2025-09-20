@@ -7,6 +7,8 @@
 /// into user prompts to ensure story continuity and narrative coherence.
 /// Now enhanced with ObliSelect smart obligation management for intelligent selection.
 
+use crate::obligations::{SmartObligationManager, ObligationScore};
+
 /// Injects obligations into a prompt by prepending each obligation as a statement.
 ///
 /// # Arguments
@@ -39,8 +41,6 @@ pub fn inject_obligations(prompt: &str, obligations: &[String]) -> String {
     injected.push_str(prompt);
     injected
 }
-
-use crate::obligations::{SmartObligationManager, ObligationScore};
 
 /// Loads obligations using the ObliSelect smart obligation management system.
 ///

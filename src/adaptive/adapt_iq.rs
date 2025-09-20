@@ -137,6 +137,19 @@ pub struct TasteLUT {
     pub boredom: f32,
 }
 
+impl TasteLUT {
+    /// Returns a balanced taste profile with moderate preferences
+    pub fn Balanced() -> Self {
+        Self {
+            curiosity: 0.5,
+            coherence_pleasure: 0.5,
+            unease: 0.5,
+            awe: 0.5,
+            boredom: 0.5,
+        }
+    }
+}
+
 impl Default for TasteLUT {
     fn default() -> Self {
         Self {
@@ -200,6 +213,7 @@ impl TasteLUT {
 }
 
 /// AdaptIQ decision engine
+#[derive(Debug, Clone)]
 pub struct AdaptIQEngine {
     /// Base entropy level of content
     pub base_entropy: f32,
@@ -313,7 +327,7 @@ impl AdaptIQEngine {
         // Check cache freshness - more entries suggest more context
         let constraint_freshness = cache.constraint_cache.len() as f32 / cache.constraint_cache.capacity() as f32;
         let capr_freshness = cache.capr_cache.len() as f32 / cache.capr_cache.capacity() as f32;
-        let character_freshness = cache.character_cache.len() as f32 / cache.character_cache.capacity() as f32;
+        let character_freshness = cache.emotion_cache.len() as f32 / cache.emotion_cache.capacity() as f32;
 
         let avg_freshness = (constraint_freshness + capr_freshness + character_freshness) / 3.0;
 
@@ -396,7 +410,7 @@ impl AdaptIQEngine {
         self.stats.avg_decision_time_ms = (self.stats.avg_decision_time_ms * ((self.stats.decision_count - 1) as f64) + decision_time) / (self.stats.decision_count as f64);
 
         // Update cache utilization
-        let total_entries = cache.constraint_cache.len() + cache.capr_cache.len() + cache.character_cache.len();
+        let total_entries = cache.constraint_cache.len() + cache.capr_cache.len() + cache.emotion_cache.len();
         let total_capacity = cache.constraint_cache.capacity() * 3; // Three caches
         self.stats.cache_utilization = total_entries as f32 / total_capacity as f32;
 

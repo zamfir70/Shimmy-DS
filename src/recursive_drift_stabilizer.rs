@@ -108,10 +108,30 @@ impl DriftStabilityState {
     pub fn get_metadata(&self, key: &str) -> Option<f32> {
         self.metadata.get(key).copied()
     }
+
+    /// Get drift indicators as a vector of key issues
+    pub fn get_drift_indicators(&self) -> Vec<String> {
+        let mut indicators = Vec::new();
+
+        if self.stale_obligations > 0 {
+            indicators.push(format!("Stale obligations: {}", self.stale_obligations));
+        }
+        if self.emotional_decay_sum > 0.5 {
+            indicators.push(format!("Emotional decay: {:.2}", self.emotional_decay_sum));
+        }
+        if self.theme_drift_score > 0.3 {
+            indicators.push(format!("Theme drift: {:.2}", self.theme_drift_score));
+        }
+        if self.spatial_return_pressure_lost {
+            indicators.push("Spatial return pressure lost".to_string());
+        }
+
+        indicators
+    }
 }
 
 /// Configuration for drift stabilizer thresholds
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriftStabilizerConfig {
     pub enabled: bool,
     pub stale_obligation_threshold: usize,

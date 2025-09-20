@@ -32,6 +32,7 @@ pub mod prompt_audit;
 pub mod shimmy_config;
 pub mod recursive_drift_stabilizer;
 pub mod stability_log;
+pub mod stability_tracing;
 
 // SHIMMY-DS Recursive Narrative System
 pub mod narrative_dna;

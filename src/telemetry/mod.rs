@@ -11,4 +11,6 @@ pub mod pulse_trace;
 pub use pulse_trace::{Pulse, PulseTrace, PulseTraceHealthStats};
 
 /// Re-export helper functions for convenience
-pub use pulse_trace::helpers::*;
+pub mod helpers {
+    pub use super::pulse_trace::helpers::*;
+}

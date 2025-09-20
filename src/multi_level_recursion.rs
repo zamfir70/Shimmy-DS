@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 /// Different levels of narrative scale
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NarrativeLevel {
     Sentence,
     Paragraph,

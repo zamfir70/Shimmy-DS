@@ -156,7 +156,7 @@ impl Default for PerformanceConfig {
 }
 
 /// Quality tier management and performance monitoring
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Qualitier {
     /// Current quality level
     pub current: QualityLevel,

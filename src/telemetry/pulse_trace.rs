@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pulse {
     /// When this pulse was recorded
-    #[serde(skip)]  // Skip Instant for JSON serialization
+    #[serde(skip, default = "Instant::now")]  // Skip Instant for JSON serialization, use current time as default
     pub timestamp: Instant,
 
     /// Timestamp as milliseconds since recording start (for JSON export)
@@ -104,7 +104,7 @@ impl Default for Pulse {
 }
 
 /// Ring buffer telemetry logger for narrative system pulses
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PulseTrace {
     /// Ring buffer of pulses
     pub buffer: VecDeque<Pulse>,
@@ -114,6 +114,12 @@ pub struct PulseTrace {
 
     /// When the trace was started (for relative timestamps)
     start_time: Instant,
+}
+
+impl Default for PulseTrace {
+    fn default() -> Self {
+        Self::new(512) // Default capacity
+    }
 }
 
 impl PulseTrace {

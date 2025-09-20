@@ -4,8 +4,10 @@
 /// This module provides functionality to calculate and monitor the pressure
 /// exerted by accumulated narrative obligations over time.
 
+use serde::{Deserialize, Serialize};
+
 /// Represents a narrative obligation with associated metadata
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Obligation {
     /// The type or category of obligation (e.g., "character_location", "mystery", "promise")
     pub kind: String,

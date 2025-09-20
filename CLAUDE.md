@@ -1,0 +1,1 @@
+- do not remove features when trying to compile, fix, but no removal of features. We built this to do these things.

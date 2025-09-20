@@ -289,6 +289,12 @@ pub struct CacheMindStats {
     pub last_load_timestamp: u64,
 }
 
+impl Default for CacheMind {
+    fn default() -> Self {
+        Self::new(128) // Default capacity
+    }
+}
+
 impl Default for CacheMindStats {
     fn default() -> Self {
         Self {
@@ -325,7 +331,7 @@ impl CacheMind {
 
     /// Retrieve constraint snapshot by key
     pub fn get_constraint_snapshot(&mut self, key: &str) -> Option<&ConstraintSnapshot> {
-        if let Some(snapshot) = self.constraint_cache.get(key) {
+        if let Some(snapshot) = self.constraint_cache.get(&key.to_string()) {
             self.stats.constraint_hits += 1;
             Some(snapshot)
         } else {
@@ -341,7 +347,7 @@ impl CacheMind {
 
     /// Retrieve CAPR path summary by key
     pub fn get_capr_summary(&mut self, key: &str) -> Option<&CAPRPathSummary> {
-        if let Some(summary) = self.capr_cache.get(key) {
+        if let Some(summary) = self.capr_cache.get(&key.to_string()) {
             self.stats.capr_hits += 1;
             Some(summary)
         } else {
@@ -357,7 +363,7 @@ impl CacheMind {
 
     /// Retrieve character emotion arc by key
     pub fn get_emotion_arc(&mut self, key: &str) -> Option<&CharacterEmotionArc> {
-        if let Some(arc) = self.emotion_cache.get(key) {
+        if let Some(arc) = self.emotion_cache.get(&key.to_string()) {
             self.stats.emotion_hits += 1;
             Some(arc)
         } else {
@@ -539,19 +545,56 @@ impl CacheMind {
         let cache_path = Self::default_cache_path();
 
         if cache_path.exists() {
-            match Self::load_from_file(cache_path) {
+            match Self::load_from_file(&cache_path) {
                 Ok(cache) => {
-                    log::info!("CacheMind loaded from {}", cache_path.display());
+                    tracing::info!("CacheMind loaded from {}", cache_path.display());
                     return cache;
                 }
                 Err(e) => {
-                    log::warn!("Failed to load CacheMind from {}: {}", cache_path.display(), e);
+                    tracing::warn!("Failed to load CacheMind from {}: {}", cache_path.display(), e);
                 }
             }
         }
 
-        log::info!("Creating new CacheMind instance");
+        tracing::info!("Creating new CacheMind instance");
         Self::new(128) // Default capacity as specified in the card
+    }
+
+    /// Set constraint snapshot in cache
+    pub fn set_constraint_snapshot(&mut self, key: String, snapshot: ConstraintSnapshot) {
+        self.constraint_cache.insert(key, snapshot);
+    }
+
+    /// Set CAPR path summary in cache
+    pub fn set_capr_path_summary(&mut self, key: String, summary: CAPRPathSummary) {
+        self.capr_cache.insert(key, summary);
+    }
+
+    /// Set character emotion arc in cache
+    pub fn set_character_emotion_arc(&mut self, key: String, arc: CharacterEmotionArc) {
+        self.emotion_cache.insert(key, arc);
+    }
+
+    /// Get CAPR path summary from cache
+    pub fn get_capr_path_summary(&mut self, key: &str) -> Option<&CAPRPathSummary> {
+        if let Some(summary) = self.capr_cache.get(&key.to_string()) {
+            self.stats.capr_hits += 1;
+            Some(summary)
+        } else {
+            self.stats.capr_misses += 1;
+            None
+        }
+    }
+
+    /// Get character emotion arc from cache
+    pub fn get_character_emotion_arc(&mut self, key: &str) -> Option<&CharacterEmotionArc> {
+        if let Some(arc) = self.emotion_cache.get(&key.to_string()) {
+            self.stats.emotion_hits += 1;
+            Some(arc)
+        } else {
+            self.stats.emotion_misses += 1;
+            None
+        }
     }
 }
 

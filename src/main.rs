@@ -409,7 +409,7 @@ async fn main() -> anyhow::Result<()> {
                 // Log stability state if enabled
                 if config.is_stability_logging_enabled() {
                     let warnings_opt = recursive_drift_stabilizer::check_recursive_drift(&drift_state, &drift_config);
-                    let _ = stability_log::log_stability_update(
+                    let _ = stability_tracing::log_stability_update(
                         drift_state.current_chapter,
                         &drift_state,
                         warnings_opt,

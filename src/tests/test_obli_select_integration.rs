@@ -10,7 +10,7 @@ use crate::prompt_injector::{
     load_smart_obligations, load_smart_obligations_with_scores
 };
 use crate::recursive_narrative_assistant::RecursiveNarrativeAssistant;
-use crate::stability_log::obli_select_telemetry;
+use crate::stability_tracing::obli_select_telemetry;
 use chrono::Utc;
 use serde_json;
 

@@ -18,7 +18,7 @@ use crate::character_consistency::{
     CharacterConsistencyEngine, CharacterPathogen, CharacterConstraintViolation, CharacterRIPAnalysis
 };
 use crate::recursive_integrity_core::{RecursiveIntegrityCore, RICMode, RICDecision, InsightStatus};
-use crate::stability_log::{StabilityLogger, RIPRICFusionLogEntry};
+use crate::stability_tracing::{StabilityLogger, RIPRICFusionLogEntry};
 use crate::obligation_pressure::Obligation;
 use crate::emotion_resonance::EmotionalState;
 use tempfile::TempDir;

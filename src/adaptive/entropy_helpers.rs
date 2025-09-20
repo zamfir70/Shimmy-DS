@@ -34,9 +34,10 @@ fn calculate_lexical_entropy(text: &str) -> f32 {
         return 0.0;
     }
 
-    let mut word_counts: HashMap<&str, usize> = HashMap::new();
+    let mut word_counts: HashMap<String, usize> = HashMap::new();
     for word in &words {
-        *word_counts.entry(word.to_lowercase().as_str()).or_insert(0) += 1;
+        let lowercase_word = word.to_lowercase();
+        *word_counts.entry(lowercase_word).or_insert(0) += 1;
     }
 
     let total_words = words.len() as f32;

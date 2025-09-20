@@ -47,6 +47,18 @@ pub enum ConstraintType {
         urgency: f32,
         must_resolve_by_chapter: Option<u32>,
     },
+    /// Plot thread constraints that maintain narrative coherence
+    PlotThread {
+        thread_id: String,
+        description: String,
+        resolution_required: bool,
+    },
+    /// Temporal constraints that block certain sequences
+    TemporalBlock {
+        description: String,
+        blocked_scenarios: Vec<String>,
+        duration: Option<u32>,
+    },
 }
 
 /// Represents a node in the constraint graph - a possible narrative state
@@ -145,16 +157,28 @@ impl ConstraintSpaceTracker {
             ConstraintType::UnresolvedThread { thread_id, .. } => {
                 format!("thread_{}", thread_id)
             }
+            ConstraintType::PlotThread { thread_id, .. } => {
+                format!("plot_{}", thread_id)
+            }
+            ConstraintType::TemporalBlock { description, .. } => {
+                format!("temporal_{}", description.chars().take(10).collect::<String>())
+            }
         }
     }
 
     /// Recalculates which paths are blocked by the new constraint
     fn recalculate_blocked_paths(&mut self, constraint_id: &str) {
         // Update edge blocking based on new constraint
-        for edge in &mut self.edges {
-            if self.edge_blocked_by_constraint(&edge.description, constraint_id) {
-                edge.is_blocked = true;
-                edge.blocked_by.push(constraint_id.to_string());
+        // First collect edge descriptions to check
+        let edge_descriptions: Vec<String> = self.edges.iter()
+            .map(|edge| edge.description.clone())
+            .collect();
+
+        // Then update edges based on constraint checks
+        for (i, description) in edge_descriptions.iter().enumerate() {
+            if self.edge_blocked_by_constraint(description, constraint_id) {
+                self.edges[i].is_blocked = true;
+                self.edges[i].blocked_by.push(constraint_id.to_string());
             }
         }
     }
@@ -390,6 +414,8 @@ impl ConstraintSpaceTracker {
                 ConstraintType::GenreExpectation { .. } => genre_constraints += 1,
                 ConstraintType::ThematicCommitment { .. } => theme_constraints += 1,
                 ConstraintType::UnresolvedThread { .. } => thread_constraints += 1,
+                ConstraintType::PlotThread { .. } => thread_constraints += 1,
+                ConstraintType::TemporalBlock { .. } => world_constraints += 1,
             }
         }
 
@@ -417,6 +443,78 @@ impl ConstraintSpaceTracker {
         }
 
         report
+    }
+
+    /// Get names of all active constraints
+    pub fn get_active_constraint_names(&self) -> Vec<String> {
+        self.constraints.iter()
+            .map(|c| match c {
+                ConstraintType::CharacterState { character, trait_name, .. } => {
+                    format!("{}_{}", character, trait_name)
+                },
+                ConstraintType::WorldLogic { rule_name, .. } => {
+                    rule_name.clone()
+                },
+                ConstraintType::GenreExpectation { genre, expectation, .. } => {
+                    format!("{}_{}", genre, expectation)
+                },
+                ConstraintType::PlotThread { thread_id, .. } => {
+                    thread_id.clone()
+                },
+                ConstraintType::TemporalBlock { description, .. } => {
+                    description.clone()
+                },
+                ConstraintType::ThematicCommitment { theme, .. } => {
+                    theme.clone()
+                },
+                ConstraintType::UnresolvedThread { thread_id, .. } => {
+                    thread_id.clone()
+                },
+            })
+            .collect()
+    }
+
+    /// Get pressure values for all constraints
+    pub fn get_constraint_pressures(&self) -> HashMap<String, f32> {
+        // Generate pressure values based on constraint history and nodes
+        let mut pressures = HashMap::new();
+
+        for (i, constraint) in self.constraints.iter().enumerate() {
+            // Simple pressure calculation based on number of blocked paths
+            let blocked_count = self.nodes.values()
+                .map(|node| node.blocked_paths.len())
+                .sum::<usize>() as f32;
+            let pressure = (blocked_count / (i + 1) as f32).min(1.0);
+
+            // Generate constraint name based on type
+            let constraint_name = match constraint {
+                ConstraintType::CharacterState { character, trait_name, .. } => {
+                    format!("{}_{}", character, trait_name)
+                }
+                ConstraintType::PlotThread { thread_id, .. } => {
+                    format!("plot_{}", thread_id)
+                }
+                ConstraintType::TemporalBlock { description, .. } => {
+                    format!("temporal_{}", description)
+                }
+                ConstraintType::ThematicCommitment { theme, .. } => {
+                    format!("theme_{}", theme)
+                }
+                ConstraintType::UnresolvedThread { thread_id, .. } => {
+                    format!("unresolved_{}", thread_id)
+                }
+                ConstraintType::WorldLogic { rule_name, .. } => {
+                    format!("world_{}", rule_name)
+                }
+                ConstraintType::GenreExpectation { genre, expectation, .. } => {
+                    format!("genre_{}_{}", genre, expectation.chars().take(10).collect::<String>())
+                }
+            };
+
+            pressures.insert(constraint_name, pressure);
+        }
+
+        pressures
     }
 }
 

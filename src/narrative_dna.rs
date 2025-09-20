@@ -74,6 +74,12 @@ pub enum TransformationType {
     DelayedConsequence,
     /// Mirror/inverse of earlier situation
     Inversion,
+    /// Narrative contradiction that creates tension
+    Contradiction,
+    /// Pressure building towards resolution
+    Pressure,
+    /// Drift in narrative consistency
+    Drift,
 }
 
 impl NarrativeDNAUnit {
@@ -193,6 +199,35 @@ impl NarrativeDNAUnit {
             Self::Contradiction { resolved, .. } => *resolved = true,
             Self::Pressure { resolved, .. } => *resolved = true,
             _ => {} // Actions and Returns don't have resolved state
+        }
+    }
+
+    /// Check if this unit represents a narrative pathogen (unresolved tension)
+    pub fn is_pathogen(&self) -> bool {
+        match self {
+            Self::Contradiction { resolved, .. } => !*resolved,
+            Self::Pressure { resolved, .. } => !*resolved,
+            _ => false,
+        }
+    }
+
+    /// Get the transformation type for this unit
+    pub fn get_transformation_type(&self) -> TransformationType {
+        match self {
+            Self::Contradiction { .. } => TransformationType::Contradiction,
+            Self::Action { .. } => TransformationType::CharacterGrowth,
+            Self::Pressure { .. } => TransformationType::Pressure,
+            Self::Return { .. } => TransformationType::SymbolicEvolution,
+        }
+    }
+
+    /// Get the ID of this unit
+    pub fn get_id(&self) -> &String {
+        match self {
+            Self::Contradiction { id, .. } => id,
+            Self::Action { id, .. } => id,
+            Self::Pressure { id, .. } => id,
+            Self::Return { id, .. } => id,
         }
     }
 }
@@ -371,7 +406,7 @@ impl NarrativeDNATracker {
                 score += 0.1;
             }
 
-            score.max(0.0).min(1.0)
+            (score as f32).max(0.0).min(1.0)
         };
 
         DNAPatternHealth {
@@ -537,6 +572,13 @@ impl NarrativeDNATracker {
     pub fn reset_ric_state(&mut self) {
         self.capr_loop_counts.clear();
         self.saturation_controller = Some(LoopSaturationController::new(10, "CAPR_DNA".to_string()));
+    }
+
+    /// Get all active pathogen units
+    pub fn get_active_pathogens(&self) -> Vec<&NarrativeDNAUnit> {
+        self.units.iter()
+            .filter(|unit| unit.is_pathogen())
+            .collect()
     }
 }
 

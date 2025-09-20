@@ -172,7 +172,7 @@ impl Default for AssistantConfig {
             },
             drift_config: DriftStabilizerConfig::default(),
             ric_mode: RICMode::default(),
-            taste_profile: TasteLUT::Balanced,
+            taste_profile: TasteLUT::Balanced(),
             enable_adapt_iq: true,
             performance_config: PerformanceConfig::default(),
             obli_select_settings: ObliSelectSettings::default(),
@@ -184,7 +184,7 @@ impl Default for AssistantConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NarrativeInsight {
     pub insight_type: InsightType,
-    pub priority: Priority,
+    pub priority: InsightPriority,
     pub title: String,
     pub description: String,
     pub questions: Vec<String>, // Questions for the author to consider
@@ -220,6 +220,15 @@ pub enum Priority {
     Medium,
     High,
     Critical,
+}
+
+/// Priority levels for insights
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum InsightPriority {
+    Critical,
+    Important,
+    Interesting,
+    Minor,
 }
 
 /// Context information for insights
@@ -335,6 +344,10 @@ pub struct RIPRICFusionHealth {
     pub loop_saturation_detected: bool,
     pub fusion_timestamp: DateTime<Utc>,
     pub overall_fusion_health: f32,
+    pub cross_system_conflicts: usize,
+    pub pathogen_detections: usize,
+    pub overall_health_score: f32,
+    pub python_rust_sync_score: f32,
 }
 
 impl RIPRICFusionState {
@@ -383,7 +396,7 @@ impl RecursiveNarrativeAssistant {
             last_updated: Utc::now(),
             ric: Some(ric),
             pulse_trace: PulseTrace::new(512), // 512 pulse capacity as specified
-            cache_mind: CacheMind::new(), // 128 capacity for each cache
+            cache_mind: CacheMind::new(128), // 128 capacity for each cache
             adapt_iq_engine: None, // Will be initialized on first use
             current_adapt_settings: AdaptIQSettings::default(),
             qualitier: Qualitier::new(100, 50, true), // Default performance config
@@ -438,7 +451,7 @@ impl RecursiveNarrativeAssistant {
                 let quality_changed = self.qualitier.decide(recent_pulse, &self.current_adapt_settings);
                 if quality_changed {
                     // Log quality level change
-                    log::info!("Qualitier changed tier to {:?}", self.qualitier.current_level());
+                    tracing::info!("Qualitier changed tier to {:?}", self.qualitier.current_level());
                 }
 
                 // Apply quality constraints to adaptive settings
@@ -495,7 +508,7 @@ impl RecursiveNarrativeAssistant {
         if health.health_score < 0.6 {
             insights.push(NarrativeInsight {
                 insight_type: InsightType::DNAPattern,
-                priority: if health.health_score < 0.4 { Priority::High } else { Priority::Medium },
+                priority: if health.health_score < 0.4 { InsightPriority::Important } else { InsightPriority::Interesting },
                 title: "Narrative DNA Health Concern".to_string(),
                 description: format!("DNA pattern health has dropped to {:.2}/1.0", health.health_score),
                 questions: vec![
@@ -515,7 +528,7 @@ impl RecursiveNarrativeAssistant {
             let top_opportunity = &opportunities[0];
             insights.push(NarrativeInsight {
                 insight_type: InsightType::RecursiveOpportunity,
-                priority: if top_opportunity.intensity_score > 1.5 { Priority::High } else { Priority::Medium },
+                priority: if top_opportunity.intensity_score > 1.5 { InsightPriority::Important } else { InsightPriority::Interesting },
                 title: "Recursive Return Opportunity".to_string(),
                 description: top_opportunity.description.clone(),
                 questions: vec![
@@ -544,9 +557,9 @@ impl RecursiveNarrativeAssistant {
 
         if freedom_score < self.config.sensitivity.constraint_pressure {
             let priority = match freedom_score {
-                f if f < 0.3 => Priority::Critical,
-                f if f < 0.5 => Priority::High,
-                _ => Priority::Medium,
+                f if f < 0.3 => InsightPriority::Critical,
+                f if f < 0.5 => InsightPriority::Important,
+                _ => InsightPriority::Interesting,
             };
 
             insights.push(NarrativeInsight {
@@ -577,7 +590,7 @@ impl RecursiveNarrativeAssistant {
         if health.health_score < 0.6 && self.config.sensitivity.pattern_breaks > 0.4 {
             insights.push(NarrativeInsight {
                 insight_type: InsightType::RecursiveOpportunity,
-                priority: Priority::Medium,
+                priority: InsightPriority::Interesting,
                 title: "Multi-Level Recursion Health".to_string(),
                 description: format!("Recursion health: {:.2} - patterns may need strengthening", health.health_score),
                 questions: vec![
@@ -603,7 +616,7 @@ impl RecursiveNarrativeAssistant {
             if issue.consistency_score < self.config.sensitivity.character_drift {
                 insights.push(NarrativeInsight {
                     insight_type: InsightType::CharacterDrift,
-                    priority: if issue.consistency_score < 0.5 { Priority::High } else { Priority::Medium },
+                    priority: if issue.consistency_score < 0.5 { InsightPriority::Important } else { InsightPriority::Interesting },
                     title: format!("Character Consistency: {}", issue.character_name),
                     description: format!("{} has consistency score {:.2} with {} violations",
                         issue.character_name, issue.consistency_score, issue.violation_count),
@@ -631,7 +644,7 @@ impl RecursiveNarrativeAssistant {
         if self.engagement_tracker.engagement_metrics.reader_retention_score < self.config.sensitivity.engagement_drops {
             insights.push(NarrativeInsight {
                 insight_type: InsightType::EngagementPattern,
-                priority: Priority::High,
+                priority: InsightPriority::Important,
                 title: "Reader Retention Concern".to_string(),
                 description: format!("Estimated retention: {:.2}",
                     self.engagement_tracker.engagement_metrics.reader_retention_score),
@@ -656,7 +669,7 @@ impl RecursiveNarrativeAssistant {
             if attention.attention_level > 0.6 {
                 insights.push(NarrativeInsight {
                     insight_type: InsightType::EngagementPattern,
-                    priority: if attention.attention_level > 0.8 { Priority::High } else { Priority::Medium },
+                    priority: if attention.attention_level > 0.8 { InsightPriority::Important } else { InsightPriority::Interesting },
                     title: format!("Engagement Loop Attention: {}", attention.loop_description),
                     description: format!("Loop needs attention (level: {:.2})", attention.attention_level),
                     questions: vec![
@@ -681,7 +694,7 @@ impl RecursiveNarrativeAssistant {
         if let Some(warnings) = check_recursive_drift(&self.drift_state, &self.config.drift_config) {
             insights.push(NarrativeInsight {
                 insight_type: InsightType::DriftAlert,
-                priority: Priority::Medium,
+                priority: InsightPriority::Interesting,
                 title: "Recursive Drift Detected".to_string(),
                 description: "Long-term narrative stability concerns detected".to_string(),
                 questions: vec![
@@ -715,7 +728,7 @@ impl RecursiveNarrativeAssistant {
         if total_pressure > 0.7 {
             insights.push(NarrativeInsight {
                 insight_type: InsightType::CrossSystemPattern,
-                priority: Priority::High,
+                priority: InsightPriority::Important,
                 title: "Convergent Narrative Pressure".to_string(),
                 description: "Multiple systems indicating high narrative pressure - possible climax approach".to_string(),
                 questions: vec![
@@ -749,7 +762,7 @@ impl RecursiveNarrativeAssistant {
 
         // Include only high priority insights in prompt
         let high_priority_insights: Vec<&NarrativeInsight> = insights.iter()
-            .filter(|i| matches!(i.priority, Priority::High | Priority::Critical))
+            .filter(|i| matches!(i.priority, InsightPriority::Important | InsightPriority::Critical))
             .take(3) // Limit to avoid overwhelming the prompt
             .collect();
 
@@ -760,7 +773,7 @@ impl RecursiveNarrativeAssistant {
                     prompt.push_str(&format!("  Consider: {}\n", insight.questions[0]));
                 }
             }
-        } else if let Some(medium_insight) = insights.iter().find(|i| i.priority == Priority::Medium) {
+        } else if let Some(medium_insight) = insights.iter().find(|i| i.priority == InsightPriority::Interesting) {
             prompt.push_str(&format!("• {}: {}\n", medium_insight.title, medium_insight.description));
         }
 
@@ -864,7 +877,7 @@ impl RecursiveNarrativeAssistant {
                     // Reroute to alternative system
                     insights = vec![NarrativeInsight {
                         insight_type: InsightType::CrossSystemPattern,
-                        priority: Priority::Medium,
+                        priority: InsightPriority::Interesting,
                         title: "System Rerouted".to_string(),
                         description: "RIC has rerouted analysis due to recursive concerns.".to_string(),
                         questions: vec!["Should we explore alternative narrative approaches?".to_string()],
@@ -926,12 +939,20 @@ impl RecursiveNarrativeAssistant {
         let rip_analysis = self.query_rip_subsystem(text, context).await?;
 
         // Step 2: Collect RIC votes from all subsystems
+        // Collect votes first to avoid borrowing conflicts
+        let dna_vote = self.dna_tracker.vote_on_narrative_state();
+        let character_vote = self.character_engine.vote_on_consistency_state();
+        let constraint_vote = self.vote_constraint_tracker();
+        let recursion_vote = self.vote_recursion_tracker();
+        let engagement_vote = self.vote_engagement_tracker();
+
         let ric_decision = if let Some(ref mut ric) = self.ric {
-            ric.vote("dna_tracker", self.dna_tracker.vote_on_narrative_state());
-            ric.vote("character_engine", self.character_engine.vote_on_consistency_state());
-            ric.vote("constraint_tracker", self.vote_constraint_tracker());
-            ric.vote("recursion_tracker", self.vote_recursion_tracker());
-            ric.vote("engagement_tracker", self.vote_engagement_tracker());
+            // Now apply the votes
+            ric.vote("dna_tracker", dna_vote);
+            ric.vote("character_engine", character_vote);
+            ric.vote("constraint_tracker", constraint_vote);
+            ric.vote("recursion_tracker", recursion_vote);
+            ric.vote("engagement_tracker", engagement_vote);
 
             ric.arbitrate()
         } else {
@@ -954,7 +975,7 @@ impl RecursiveNarrativeAssistant {
             text: text.to_string(),
             context: context.to_string(),
             seed: self.current_obligations.iter()
-                .map(|o| o.description.clone())
+                .map(|o| o.kind.clone())
                 .collect::<Vec<String>>()
                 .join("; "),
             beat: format!("Chapter {}, Scene {:?}", self.current_chapter, self.current_scene),
@@ -1056,11 +1077,11 @@ impl RecursiveNarrativeAssistant {
                     consensus_confidence,
                 }
             }
-            RICDecision::Reroute(alternative) => {
+            RICDecision::Reroute(ref alternative) => {
                 // Treat reroute as continue with modified confidence
                 UnifiedArbitrationDecision::ContinueRecursion {
                     rip_vote: format!("REROUTED: {}", rip_analysis.rip_vote),
-                    ric_vote: ric_decision,
+                    ric_vote: RICDecision::Reroute(alternative.clone()),
                     consensus_confidence: 0.5, // Reduced confidence for rerouted decisions
                 }
             }
@@ -1108,6 +1129,10 @@ impl RecursiveNarrativeAssistant {
             loop_saturation_detected: self.rip_ric_fusion_state.loop_saturation_detected,
             fusion_timestamp: self.rip_ric_fusion_state.last_fusion_update,
             overall_fusion_health: self.calculate_overall_fusion_health(),
+            cross_system_conflicts: 0, // TODO: implement cross-system conflict detection
+            pathogen_detections: 0, // TODO: implement pathogen detection counting
+            overall_health_score: self.calculate_overall_fusion_health(),
+            python_rust_sync_score: 1.0, // TODO: implement actual sync score calculation
         }
     }
 
@@ -1132,47 +1157,47 @@ impl RecursiveNarrativeAssistant {
     }
 
     /// Helper voting methods for RIC integration
-    fn vote_constraint_tracker(&self) -> String {
+    fn vote_constraint_tracker(&self) -> InsightStatus {
         let freedom_score = self.constraint_tracker.calculate_freedom_score();
-        let pressure_analysis = self.constraint_tracker.analyze_constraint_pressure();
+        let _pressure_analysis = self.constraint_tracker.analyze_constraint_pressure();
 
         if freedom_score < 0.2 {
-            "HALT_CRITICAL_CONSTRAINT_PRESSURE".to_string()
+            InsightStatus::Block
         } else if freedom_score < 0.4 {
-            "CAUTION_HIGH_CONSTRAINT_PRESSURE".to_string()
+            InsightStatus::Suggest
         } else if freedom_score < 0.6 {
-            "CONTINUE_MODERATE_CONSTRAINT_PRESSURE".to_string()
+            InsightStatus::Continue
         } else {
-            "CONTINUE_LOW_CONSTRAINT_PRESSURE".to_string()
+            InsightStatus::Continue
         }
     }
 
-    fn vote_recursion_tracker(&self) -> String {
+    fn vote_recursion_tracker(&self) -> InsightStatus {
         let recursion_health = self.recursion_tracker.analyze_recursion_health();
 
         if recursion_health.health_score < 0.3 {
-            "HALT_POOR_RECURSION_HEALTH".to_string()
+            InsightStatus::Block
         } else if recursion_health.health_score < 0.5 {
-            "CAUTION_MODERATE_RECURSION_HEALTH".to_string()
+            InsightStatus::Suggest
         } else if recursion_health.health_score < 0.7 {
-            "CONTINUE_GOOD_RECURSION_HEALTH".to_string()
+            InsightStatus::Continue
         } else {
-            "CONTINUE_EXCELLENT_RECURSION_HEALTH".to_string()
+            InsightStatus::Continue
         }
     }
 
-    fn vote_engagement_tracker(&self) -> String {
+    fn vote_engagement_tracker(&self) -> InsightStatus {
         let retention_score = self.engagement_tracker.engagement_metrics.reader_retention_score;
         let active_loops = self.engagement_tracker.get_loops_requiring_attention().len();
 
         if retention_score < 0.3 {
-            "HALT_CRITICAL_ENGAGEMENT_LOSS".to_string()
+            InsightStatus::Block
         } else if retention_score < 0.5 || active_loops > 5 {
-            "CAUTION_ENGAGEMENT_CONCERNS".to_string()
+            InsightStatus::Suggest
         } else if retention_score < 0.7 {
-            "CONTINUE_MODERATE_ENGAGEMENT".to_string()
+            InsightStatus::Continue
         } else {
-            "CONTINUE_STRONG_ENGAGEMENT".to_string()
+            InsightStatus::Continue
         }
     }
 
@@ -1194,12 +1219,12 @@ impl RecursiveNarrativeAssistant {
         context
     }
 
-    fn priority_value(&self, priority: &Priority) -> u8 {
+    fn priority_value(&self, priority: &InsightPriority) -> u8 {
         match priority {
-            Priority::Critical => 4,
-            Priority::High => 3,
-            Priority::Medium => 2,
-            Priority::Low => 1,
+            InsightPriority::Critical => 4,
+            InsightPriority::Important => 3,
+            InsightPriority::Interesting => 2,
+            InsightPriority::Minor => 1,
         }
     }
 
@@ -1300,7 +1325,7 @@ impl RecursiveNarrativeAssistant {
 
         // Get ZC tick from RIC if available
         let zc_tick = if let Some(ref ric) = self.ric {
-            ric.get_iteration_count() // Assuming this method exists
+            ric.get_iteration_count() as usize // Convert u32 to usize
         } else {
             0
         };
@@ -1448,15 +1473,15 @@ impl RecursiveNarrativeAssistant {
         let summary = CAPRPathSummary {
             loop_count: dna_health.total_units as usize,
             last_return_vector: active_pathogens.iter()
-                .map(|p| format!("{:?}", p.transformation_type))
+                .map(|p| format!("{:?}", p.get_transformation_type()))
                 .collect(),
             active_contradictions: active_pathogens.iter()
-                .filter(|p| matches!(p.transformation_type, TransformationType::Contradiction))
-                .map(|p| p.tag.clone())
+                .filter(|p| matches!(p.get_transformation_type(), TransformationType::Contradiction))
+                .map(|p| p.get_id().clone())
                 .collect(),
             pressure_points: active_pathogens.iter()
-                .filter(|p| matches!(p.transformation_type, TransformationType::Pressure))
-                .map(|p| p.tag.clone())
+                .filter(|p| matches!(p.get_transformation_type(), TransformationType::Pressure))
+                .map(|p| p.get_id().clone())
                 .collect(),
             avg_loop_duration: dna_health.health_score * 100.0, // Approximate
             last_loop_quality: dna_health.health_score,
@@ -1503,17 +1528,17 @@ impl RecursiveNarrativeAssistant {
     }
 
     /// Get cached constraint snapshot by key
-    pub fn get_cached_constraint_snapshot(&self, key: &str) -> Option<&ConstraintSnapshot> {
+    pub fn get_cached_constraint_snapshot(&mut self, key: &str) -> Option<&ConstraintSnapshot> {
         self.cache_mind.get_constraint_snapshot(key)
     }
 
     /// Get cached CAPR path summary by key
-    pub fn get_cached_capr_path_summary(&self, key: &str) -> Option<&CAPRPathSummary> {
+    pub fn get_cached_capr_path_summary(&mut self, key: &str) -> Option<&CAPRPathSummary> {
         self.cache_mind.get_capr_path_summary(key)
     }
 
     /// Get cached character emotion arc by key
-    pub fn get_cached_character_emotion_arc(&self, key: &str) -> Option<&CharacterEmotionArc> {
+    pub fn get_cached_character_emotion_arc(&mut self, key: &str) -> Option<&CharacterEmotionArc> {
         self.cache_mind.get_character_emotion_arc(key)
     }
 
@@ -1531,26 +1556,27 @@ impl RecursiveNarrativeAssistant {
                 "hit_ratio": self.cache_mind.capr_cache.hit_ratio()
             },
             "character_cache": {
-                "size": self.cache_mind.character_cache.len(),
-                "capacity": self.cache_mind.character_cache.capacity(),
-                "hit_ratio": self.cache_mind.character_cache.hit_ratio()
+                "size": self.cache_mind.emotion_cache.len(),
+                "capacity": self.cache_mind.emotion_cache.capacity(),
+                "hit_ratio": 0.0 // TODO: implement actual hit ratio calculation
             }
         })
     }
 
     /// Load cache state from JSON file
     pub fn load_cache_from_file(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.cache_mind.load_from_file(path)
+        self.cache_mind = CacheMind::load_from_file(path).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        Ok(())
     }
 
     /// Save cache state to JSON file
-    pub fn save_cache_to_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.cache_mind.save_to_file(path)
+    pub fn save_cache_to_file(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.cache_mind.save_to_file(path).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 
     /// Auto-save cache state to default location
-    pub fn auto_save_cache(&self) -> Result<(), Box<dyn std::error::Error>> {
-        self.cache_mind.auto_save()
+    pub fn auto_save_cache(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.cache_mind.auto_save().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 
     /// Clear all cache entries
@@ -1674,7 +1700,7 @@ impl RecursiveNarrativeAssistant {
 
         // Adjust sensitivity settings based on pathogen sensitivity
         self.config.sensitivity.constraint_pressure *= settings.pathogen_sensitivity;
-        self.config.sensitivity.character_inconsistency *= settings.pathogen_sensitivity;
+        self.config.sensitivity.character_drift *= settings.pathogen_sensitivity;
 
         // The recursion_depth, beat_sampling_rate, etc. would be used by the
         // actual analysis algorithms when they're implemented
@@ -1724,7 +1750,7 @@ impl RecursiveNarrativeAssistant {
     /// Set quality level manually (bypasses adaptive logic)
     pub fn set_quality_level(&mut self, level: QualityLevel) {
         self.qualitier.set_quality_level(level);
-        log::info!("Quality level manually set to {:?}", level);
+        tracing::info!("Quality level manually set to {:?}", level);
     }
 
     /// Check if a feature is enabled at current quality level
@@ -1741,7 +1767,7 @@ impl RecursiveNarrativeAssistant {
     pub fn update_performance_config(&mut self, config: PerformanceConfig) {
         self.config.performance_config = config.clone();
         self.qualitier = Qualitier::with_config(config);
-        log::info!("Performance configuration updated");
+        tracing::info!("Performance configuration updated");
     }
 
     /// Reset Qualitier statistics
@@ -1814,7 +1840,7 @@ impl RecursiveNarrativeAssistant {
         if let Some(recent_pulse) = self.pulse_trace.latest() {
             let quality_changed = self.qualitier.decide(recent_pulse, &self.current_adapt_settings);
             if quality_changed {
-                log::info!("Quality reassessment changed tier to {:?}", self.qualitier.current_level());
+                tracing::info!("Quality reassessment changed tier to {:?}", self.qualitier.current_level());
                 // Apply quality constraints to adaptive settings
                 self.qualitier.clamp_settings(&mut self.current_adapt_settings);
             }
@@ -1856,10 +1882,10 @@ impl RecursiveNarrativeAssistant {
 
     /// Updates ObliSelect context with current narrative state
     pub fn update_obligation_context(&mut self) {
-        let recent_characters = self.character_engine.get_all_profiles()
-            .keys()
+        let recent_characters: Vec<String> = self.character_engine.get_all_profiles()
+            .iter()
             .take(5)
-            .cloned()
+            .map(|profile| profile.name.clone())
             .collect();
 
         let tension_level = self.current_emotional_state
@@ -2151,7 +2177,7 @@ mod tests {
         let insights = vec![
             NarrativeInsight {
                 insight_type: InsightType::DNAPattern,
-                priority: Priority::Medium,
+                priority: InsightPriority::Interesting,
                 title: "Test 1".to_string(),
                 description: "Test".to_string(),
                 questions: vec![],
@@ -2221,21 +2247,6 @@ mod tests {
     }
 }
 
-impl Default for AssistantConfig {
-    fn default() -> Self {
-        Self {
-            auto_pattern_detection: true,
-            assertiveness_level: 0.5,
-            enabled_systems: EnabledSystems::default(),
-            sensitivity: SensitivitySettings::default(),
-            drift_config: DriftStabilizerConfig::default(),
-            ric_mode: RICMode::default(),
-            taste_profile: TasteLUT::default(),
-            enable_adapt_iq: true,
-            performance_config: PerformanceConfig::default(),
-        }
-    }
-}
 
 impl Default for EnabledSystems {
     fn default() -> Self {
@@ -2247,6 +2258,7 @@ impl Default for EnabledSystems {
             engagement_loops: true,
             drift_stabilization: true,
             adaptive_intelligence: true,
+            obligation_management: true,
         }
     }
 }

@@ -25,7 +25,7 @@ pub struct Obligation {
 }
 
 /// Categories of narrative obligations for contextual grouping
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ObligationCategory {
     CharacterDevelopment,
     PlotAdvancement,
@@ -40,7 +40,7 @@ pub enum ObligationCategory {
 }
 
 /// Urgency levels for obligation prioritization
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ObligationUrgency {
     Low,      // Can wait many chapters
     Medium,   // Should be addressed within a few chapters
@@ -75,6 +75,23 @@ pub struct ObligationMetrics {
     pub fulfillment_progress_average: f32,
     pub dependency_chain_length_max: usize,
     pub last_selection_performance_ms: u64,
+}
+
+impl Default for ObligationMetrics {
+    fn default() -> Self {
+        Self {
+            total_obligations: 0,
+            obligations_by_category: HashMap::new(),
+            obligations_by_urgency: HashMap::new(),
+            average_injection_count: 0.0,
+            stale_obligations: 0,
+            overused_obligations: 0,
+            tension_distribution: (0.0, 0.0, 0.0),
+            fulfillment_progress_average: 0.0,
+            dependency_chain_length_max: 0,
+            last_selection_performance_ms: 0,
+        }
+    }
 }
 
 /// Configuration settings for ObliSelect behavior
@@ -116,6 +133,7 @@ impl Default for ObliSelectSettings {
 }
 
 /// Core ObliSelect smart obligation management system
+#[derive(Debug, Clone, Default)]
 pub struct SmartObligationManager {
     obligations: HashMap<String, Obligation>,
     settings: ObliSelectSettings,
@@ -368,8 +386,10 @@ impl SmartObligationManager {
 
         // Boost if obligation content relates to current narrative context
         if !self.narrative_context.is_empty() {
-            let context_words: Vec<&str> = self.narrative_context.to_lowercase().split_whitespace().collect();
-            let obligation_words: Vec<&str> = obligation.content.to_lowercase().split_whitespace().collect();
+            let context_lowercase = self.narrative_context.to_lowercase();
+            let obligation_lowercase = obligation.content.to_lowercase();
+            let context_words: Vec<&str> = context_lowercase.split_whitespace().collect();
+            let obligation_words: Vec<&str> = obligation_lowercase.split_whitespace().collect();
 
             let common_words = context_words.iter()
                 .filter(|word| obligation_words.contains(word))

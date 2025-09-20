@@ -401,20 +401,28 @@ impl ReaderEngagementTracker {
         let current_time = Utc::now();
         let stale_threshold = chrono::Duration::hours(2); // 2 hours in story time
 
+        // Collect loops that need abandonment events
+        let mut loops_to_abandon = Vec::new();
+
         for (loop_id, loop_data) in &mut self.loops {
             if loop_data.is_active && current_time - loop_data.last_reinforcement > stale_threshold {
                 // Mark loop as potentially stale
                 loop_data.current_intensity *= 0.9; // Gradual decay
 
                 if loop_data.current_intensity < 0.1 {
-                    self.add_loop_event(
-                        loop_id,
-                        LoopEventType::Abandonment,
-                        "Loop abandoned due to lack of reinforcement".to_string(),
-                        -loop_data.current_intensity,
-                    );
+                    loops_to_abandon.push((loop_id.clone(), loop_data.current_intensity));
                 }
             }
+        }
+
+        // Add abandonment events for stale loops
+        for (loop_id, intensity) in loops_to_abandon {
+            self.add_loop_event(
+                &loop_id,
+                LoopEventType::Abandonment,
+                "Loop abandoned due to lack of reinforcement".to_string(),
+                -intensity,
+            );
         }
     }
 
@@ -571,7 +579,7 @@ impl ReaderEngagementTracker {
             score -= 0.1;
         }
 
-        score.max(0.0).min(1.0)
+        (score as f32).max(0.0).min(1.0)
     }
 
     /// Gets all active loops requiring attention

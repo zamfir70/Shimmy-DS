@@ -42,7 +42,7 @@ pub enum InsightStatus {
 }
 
 /// Decision made by the arbitration engine
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RICDecision {
     /// Continue processing normally
     Continue,
@@ -55,7 +55,7 @@ pub enum RICDecision {
 }
 
 /// Status of RIC operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RICStatus {
     /// System is operating normally
     Healthy,
@@ -293,7 +293,7 @@ impl InsightArbitrator {
 
 /// Main Recursive Integrity Core
 /// Coordinates all integrity mechanisms
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RecursiveIntegrityCore {
     pub mode: RICMode,
     pub arbitrator: InsightArbitrator,
@@ -408,6 +408,11 @@ impl RecursiveIntegrityCore {
             uptime: self.start_time.elapsed(),
             active_subsystems: self.saturation_controllers.len(),
         }
+    }
+
+    /// Get the total iteration count across all arbitrations
+    pub fn get_iteration_count(&self) -> u32 {
+        self.intervention_count // Use intervention count as a proxy for iterations
     }
 }
 

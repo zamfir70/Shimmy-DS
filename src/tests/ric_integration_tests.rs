@@ -13,7 +13,7 @@ use crate::recursive_integrity_core::*;
 use crate::narrative_dna::NarrativeDNATracker;
 use crate::character_consistency::CharacterConsistencyEngine;
 use crate::recursive_narrative_assistant::{RecursiveNarrativeAssistant, AssistantConfig};
-use crate::stability_log::{StabilityLogger, RICLogEntry};
+use crate::stability_tracing::{StabilityLogger, RICLogEntry};
 use std::collections::HashMap;
 use tempfile::TempDir;
 
