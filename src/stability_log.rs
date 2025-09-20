@@ -3,14 +3,15 @@
 /// This module provides specialized logging and reporting capabilities
 /// for the Recursive Drift Stabilizer system.
 
-use crate::recursive_drift_stabilizer::{DriftStabilityState, DriftStabilizerConfig};
+use crate::recursive_drift_stabilizer::DriftStabilityState;
 use crate::recursive_integrity_core::{
-    RICDecision, RICHealthSummary, RICMode, InsightStatus
+    RICDecision, RICMode, InsightStatus
 };
 use crate::recursive_narrative_assistant::{
     UnifiedArbitrationDecision, RIPRICFusionHealth
 };
-use crate::telemetry::{PulseTrace, Pulse, PulseTraceHealthStats};
+use crate::telemetry::pulse_trace::{Pulse};
+use crate::adaptive::qualitier::QualityLevel;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
@@ -1245,8 +1246,8 @@ pub mod telemetry_integration {
 
     /// Log Qualitier quality level change
     pub fn log_quality_change(
-        old_level: crate::adaptive::QualityLevel,
-        new_level: crate::adaptive::QualityLevel,
+        old_level: QualityLevel,
+        new_level: QualityLevel,
         chapter: u32,
         memory_pressure: f32,
         narrative_stress: f32,
@@ -1275,7 +1276,7 @@ pub mod telemetry_integration {
     /// Log Qualitier performance degradation
     pub fn log_performance_degradation(
         reason: &str,
-        current_level: crate::adaptive::QualityLevel,
+        current_level: QualityLevel,
         chapter: u32,
         memory_usage_mb: u64,
     ) {
@@ -1298,7 +1299,7 @@ pub mod telemetry_integration {
 
     /// Log Qualitier narrative stress upgrade
     pub fn log_narrative_stress_upgrade(
-        current_level: crate::adaptive::QualityLevel,
+        current_level: QualityLevel,
         chapter: u32,
         pathogen_count: usize,
         adi_score: f32,
@@ -1330,10 +1331,10 @@ pub mod telemetry_integration {
     ) -> Pulse {
         // Convert quality level to numeric pathogen count
         let pathogens_detected = match status.current_level {
-            crate::adaptive::QualityLevel::Minimal => 5,   // High pathogen inference
-            crate::adaptive::QualityLevel::Standard => 2,  // Moderate
-            crate::adaptive::QualityLevel::Enhanced => 1,  // Low
-            crate::adaptive::QualityLevel::Premium => 0,   // Clean
+            QualityLevel::Minimal => 5,   // High pathogen inference
+            QualityLevel::Standard => 2,  // Moderate
+            QualityLevel::Enhanced => 1,  // Low
+            QualityLevel::Premium => 0,   // Clean
         };
 
         // Drift hits based on memory degradations
@@ -1344,14 +1345,14 @@ pub mod telemetry_integration {
         };
 
         // ADI score inverse to memory pressure
-        let adi_score = (1.0 - status.memory_pressure).max(0.0).min(1.0);
+        let adi_score = (1.0_f32 - status.memory_pressure).max(0.0).min(1.0);
 
         // Affect based on quality level
         let affect_pleasure = match status.current_level {
-            crate::adaptive::QualityLevel::Minimal => -0.4,
-            crate::adaptive::QualityLevel::Standard => 0.0,
-            crate::adaptive::QualityLevel::Enhanced => 0.3,
-            crate::adaptive::QualityLevel::Premium => 0.6,
+            QualityLevel::Minimal => -0.4,
+            QualityLevel::Standard => 0.0,
+            QualityLevel::Enhanced => 0.3,
+            QualityLevel::Premium => 0.6,
         };
 
         // Coherence based on adaptive functioning

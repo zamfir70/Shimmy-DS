@@ -7,14 +7,11 @@ mod main_integration;
 mod model_registry;
 mod openai_compat;
 mod port_manager;
-mod prompt_injector;
-mod waymark_validator;
-mod obligation_pressure;
-mod emotion_resonance;
-mod prompt_audit;
-mod shimmy_config;
-mod recursive_drift_stabilizer;
-mod stability_log;
+// Use library modules instead of local modules
+use shimmy::{
+    prompt_injector, waymark_validator, obligation_pressure, emotion_resonance,
+    prompt_audit, shimmy_config, recursive_drift_stabilizer, stability_log, stability_tracing
+};
 mod server;
 mod templates;
 mod util {
@@ -343,6 +340,19 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
+            // Generate with the processed prompt
+            let out = loaded
+                .generate(
+                    &final_prompt,
+                    engine::GenOptions {
+                        max_tokens,
+                        stream: false,
+                        ..Default::default()
+                    },
+                    None,
+                )
+                .await?;
+
             // Phase 6: Recursive Drift Stabilizer
             if config.is_drift_stabilizer_enabled() {
                 // Create drift stability state
@@ -442,8 +452,8 @@ async fn main() -> anyhow::Result<()> {
             let model_entry = ModelEntry {
                 name: name.clone(),
                 base_path: base_path.into(),
-                lora_path: lora_path.map(Into::into),
-                template,
+                lora_path: lora_path.clone().map(Into::into),
+                template: template.clone(),
                 ctx_len: Some(final_ctx_len),
                 n_threads,
             };
